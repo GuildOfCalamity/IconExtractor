@@ -45,7 +45,7 @@ public static class Extensions
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"[ERROR] {ex.Message}");
+                        Debug.WriteLine($"[ERROR] ExtractSelectedIconsFromDLL: {ex.Message}");
                     }
                 }
             }
@@ -75,34 +75,24 @@ public static class Extensions
             }
             else
             {
-                using var icon = Shell32.ExtractIcon(currentProc.Handle, file, i);
-                using var image = icon.ToBitmap();
+                try
+                {
+                    using var icon = Shell32.ExtractIcon(currentProc.Handle, file, i);
+                    using var image = icon.ToBitmap();
 
-                byte[] bitmapData = (byte[])(new ImageConverter().ConvertTo(image, typeof(byte[])) ?? Array.Empty<byte>());
-                iconInfo = new IconFileInfo(bitmapData, i);
-                _iconCache[(file, i, -1)] = iconInfo;
-                iconsList.Add(iconInfo);
+                    byte[] bitmapData = (byte[])(new ImageConverter().ConvertTo(image, typeof(byte[])) ?? Array.Empty<byte>());
+                    iconInfo = new IconFileInfo(bitmapData, i);
+                    _iconCache[(file, i, -1)] = iconInfo;
+                    iconsList.Add(iconInfo);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[ERROR] ExtractIconsFromDLL: {ex.Message}");
+                }
             }
         }
 
         return iconsList;
-    }
-
-    public static void SaveBitmapImage(this System.Windows.Media.Imaging.BitmapImage image, string filePath)
-    {
-        try
-        {
-            System.Windows.Media.Imaging.BitmapEncoder encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
-            encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(image));
-            using (var fileStream = new System.IO.FileStream(filePath, System.IO.FileMode.Create))
-            {
-                encoder.Save(fileStream);
-            }
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[ERROR] SaveBitmapImage: {ex.Message}");
-        }
     }
 
     /// <summary>

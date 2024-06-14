@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -237,7 +237,7 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
             var testPath = System.IO.Path.Combine(Constants.UserEnvironmentPaths.SystemRootPath, "System32", TargetDLL);
             if (!File.Exists(testPath))
             {
-                Status = $"DLL was not found";
+                Status = $"⚠️ DLL was not found";
                 return;
             }
 
@@ -246,7 +246,7 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
             IconItems.Clear();
 
             var request = Enumerable.Range(1, 3000).ToList();
-            Status = $"Checking {request.Count} indices...";
+            Status = $"✔️ Checking {request.Count} indices...";
             IList<IconFileInfo>? fullImageResList = null;
             var extraction = Task.Run(() =>
             {
@@ -276,21 +276,11 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
                                             if (SaveToDisk)
                                             {
                                                 try
-                                                {
-                                                    if (bmp.UriSource is not null)
-                                                    {
-                                                        RandomAccessStreamReference stream = RandomAccessStreamReference.CreateFromUri(bmp.UriSource);
-                                                        var streamContent = await stream.OpenReadAsync();
-                                                        byte[] buffer = new byte[streamContent.Size];
-                                                        await streamContent.ReadAsync(buffer.AsBuffer(), (uint)streamContent.Size, InputStreamOptions.None);
-                                                        using (BinaryWriter bw = new BinaryWriter(File.Open($@"D:\cache\Index{img.Index}.ico", FileMode.Create)))
-                                                        {
-                                                            foreach (byte b in buffer) { bw.Write(b); }
-                                                            bw.Flush();
-                                                        }
-                                                    }
+                                                {   // NOTE: When extracting icon assets from a DLL, the UriSource does not exist.
+                                                    // In an effort to make this feature a reality, I've created a "alternative" approach.
+                                                    await BitmapHelper.SaveImageSourceToFileAsync(hostGrid, ImgSource, Path.Combine(AppContext.BaseDirectory, $"IconIndex{img.Index}.png"));
                                                 }
-                                                catch (Exception ex) { Status = $"Write: {ex.Message}"; }
+                                                catch (Exception ex) { Status = $"⚠️ Save: {ex.Message}"; }
                                             }
                                         }
                                     });
@@ -299,7 +289,7 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
                         }
                         else
                         {
-                            Status = $"DLL contained no usable icons";
+                            Status = $"⚠️ DLL contained no usable icons";
                         }
                     }
                     catch (Exception ex)
@@ -311,7 +301,7 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
                 }
                 else
                 {
-                    Status = $"No results to show";
+                    Status = $"⚠️ No results to show";
                 }
             });
         });
@@ -341,10 +331,10 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
             {
                 await encoder.FlushAsync();
             }
-            catch (Exception err)
+            catch (Exception ex)
             {
                 const int WINCODEC_ERR_UNSUPPORTEDOPERATION = unchecked((int)0x88982F81);
-                switch (err.HResult)
+                switch (ex.HResult)
                 {
                     case WINCODEC_ERR_UNSUPPORTEDOPERATION:
                         // If the encoder does not support writing a thumbnail, then try again
@@ -363,20 +353,6 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
         }
     }
 
-    async Task<SoftwareBitmap>? LoadSoftwareBitmap(string filePath)
-    {
-        SoftwareBitmap? softwareBitmap;
-        StorageFile inputFile = await StorageFile.GetFileFromPathAsync(filePath);
-        using (IRandomAccessStream ras = await inputFile.OpenAsync(FileAccessMode.Read))
-        {
-            // Create the decoder from the stream
-            BitmapDecoder decoder = await BitmapDecoder.CreateAsync(ras);
-            // Get the SoftwareBitmap representation of the file
-            softwareBitmap = await decoder.GetSoftwareBitmapAsync();
-        }
-        return softwareBitmap;
-    }
-
     void ItemsGridViewOnLoaded(object sender, RoutedEventArgs e)
     {
         // Delegate loading of icons, so we have smooth navigating to this page and do not unnecessarily block the UI thread.
@@ -390,7 +366,7 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
 
         _loaded = true;
         TargetDLL = dlls[0];
-        Status = "System ready";
+        Status = "✔️ System ready";
     }
 
     void IconsOnTemplatePointerPressed(object sender, PointerRoutedEventArgs e)
