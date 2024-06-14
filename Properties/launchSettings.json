@@ -1,0 +1,10 @@
+{
+    "profiles": {
+        "IconExtractor (Package)": {
+            "commandName": "MsixPackage"
+        },
+        "IconExtractor (Unpackaged)": {
+            "commandName": "Project"
+        }
+    }
+}

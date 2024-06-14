@@ -1,0 +1,126 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>IconExtractor</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Platforms>x86;x64;ARM64</Platforms>
+    <RuntimeIdentifiers Condition="$([MSBuild]::GetTargetFrameworkVersion('$(TargetFramework)')) &gt;= 8">win-x86;win-x64;win-arm64</RuntimeIdentifiers>
+    <RuntimeIdentifiers Condition="$([MSBuild]::GetTargetFrameworkVersion('$(TargetFramework)')) &lt; 8">win10-x86;win10-x64;win10-arm64</RuntimeIdentifiers>
+    <PublishProfile>win-$(Platform).pubxml</PublishProfile>
+    <UseWinUI>true</UseWinUI>
+    <Nullable>enable</Nullable>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <ApplicationIcon>Assets\StoreLogo.ico</ApplicationIcon>
+    <!-- 
+        [for SDK v1.5 specifically]
+        https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/stable-channel#other-new-features-from-across-the-winappsdk
+        <PublishSingleFile>true</PublishSingleFile>
+        <SelfContained>true</SelfContained>
+        https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/stable-channel#known-issues
+        <ShouldComputeInputPris>true</ShouldComputeInputPris>
+    -->
+      <LangVersion>latest</LangVersion>
+      <EnableMsixTooling>true</EnableMsixTooling>
+      <Version>1.0.0.0</Version>
+      <FileVersion>1.0.0.0</FileVersion>
+      <AssemblyVersion>1.0.0.0</AssemblyVersion>
+      <PackageId>IconExtractor2024</PackageId>
+      <Authors>The Guild</Authors>
+      <!-- 
+      WindowsPackageType defines whether your app is packaged (MSIX) or unpackaged (None) 
+    -->
+      <WindowsPackageType>None</WindowsPackageType>
+      <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+      <!-- 
+      Get rid of all the unnecessary pathing that MS adds and 
+      makes the output match the traditional .NET Framework builds.
+    -->
+      <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+      <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+      <!-- 
+         https://learn.microsoft.com/en-us/dotnet/core/project-sdk/msbuild-props#generatedocumentationfile
+    -->
+      <!-- <GenerateDocumentationFile>true</GenerateDocumentationFile> -->
+      <!-- 
+         https://learn.microsoft.com/en-us/dotnet/core/project-sdk/msbuild-props#optimizeimplicitlytriggeredbuild 
+    -->
+      <OptimizeImplicitlyTriggeredBuild>true</OptimizeImplicitlyTriggeredBuild>
+      <!-- 
+         If true, this will create a subfolder named "refs" which contains all of the possible framework dependencies. The default value is false.
+         https://learn.microsoft.com/en-us/dotnet/core/project-sdk/msbuild-props#preservecompilationcontext
+    -->
+      <PreserveCompilationContext>false</PreserveCompilationContext>
+  </PropertyGroup>
+
+  <!-- 
+     Define "IS_UNPACKAGED" constant if the app is an unpackaged app. 
+  -->
+  <PropertyGroup Condition="'$(WindowsPackageType)' == 'None'">
+      <DefineConstants>IS_UNPACKAGED</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="Assets\Fonts\Aptos.ttf" />
+    <None Remove="Assets\Fonts\Aptos_Mono.ttf" />
+    <None Remove="MainPage.xaml" />
+    <None Remove="Styles\FontSizes.xaml" />
+  </ItemGroup>
+    
+  <ItemGroup>
+    <Content Include="Assets\SplashScreen.scale-200.png" />
+    <Content Include="Assets\LockScreenLogo.scale-200.png" />
+    <Content Include="Assets\Square150x150Logo.scale-200.png" />
+    <Content Include="Assets\Square44x44Logo.scale-200.png" />
+    <Content Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png" />
+    <Content Include="Assets\StoreLogo.png" />
+    <Content Include="Assets\Wide310x150Logo.scale-200.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.22621.3233" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.5.240607001" />
+    <PackageReference Include="Vanara.Windows.Extensions" Version="4.0.1" />
+    <PackageReference Include="Vanara.Windows.Shell" Version="4.0.1" />
+    <Manifest Include="$(ApplicationManifest)" />
+  </ItemGroup>
+
+  <!--
+    Defining the "Msix" ProjectCapability here allows the Single-project MSIX Packaging
+    Tools extension to be activated for this project even if the Windows App SDK Nuget
+    package has not yet been restored.
+  -->
+  <ItemGroup Condition="'$(DisableMsixProjectCapabilityAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
+    <ProjectCapability Include="Msix" />
+  </ItemGroup>
+  <ItemGroup>
+    <Page Update="MainPage.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+  </ItemGroup>
+  <ItemGroup>
+    <Page Update="Styles\FontSizes.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+  </ItemGroup>
+
+  <!--
+    Defining the "HasPackageAndPublishMenuAddedByProject" property here allows the Solution
+    Explorer "Package and Publish" context menu entry to be enabled for this project even if
+    the Windows App SDK Nuget package has not yet been restored.
+  -->
+  <PropertyGroup Condition="'$(DisableHasPackageAndPublishMenuAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
+    <HasPackageAndPublishMenu>true</HasPackageAndPublishMenu>
+  </PropertyGroup>
+
+  <!-- 
+      This target will remove the language folders inside the build output except the specified one. 
+  -->
+  <Target Name="RemoveFoldersWithMuiFiles" AfterTargets="Build">
+        <ItemGroup>
+            <RemovingFiles Include="$(OutDir)*\*.mui" Exclude="$(OutDir)en-us\*.mui" />
+            <RemovingFolders Include="@(RemovingFiles->'%(RootDir)%(Directory)')" />
+        </ItemGroup>
+        <RemoveDir Directories="@(RemovingFolders)" />
+  </Target>
+</Project>
