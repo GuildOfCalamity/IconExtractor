@@ -97,6 +97,7 @@ internal static class BitmapHelper
     /// <param name="filePath">The full path to write the image.</param>
     /// <param name="width">16 to 256</param>
     /// <param name="height">16 to 256</param>
+    /// <remarks>If the width or height is not correct then the </remarks>
     public static async Task SaveImageSourceToFileAsync(Microsoft.UI.Xaml.Controls.Grid hostGrid, Microsoft.UI.Xaml.Media.ImageSource imageSource, string filePath, int width = 32, int height = 32)
     {
         // Create an Image control to hold the ImageSource
@@ -126,11 +127,24 @@ internal static class BitmapHelper
         // Remove the Image control from the host Grid
         hostGrid.Children.Remove(imageControl);
 
-        Windows.Graphics.Imaging.SoftwareBitmap softwareBitmap = new Windows.Graphics.Imaging.SoftwareBitmap(Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8, renderTargetBitmap.PixelWidth, renderTargetBitmap.PixelHeight, Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied);
-        softwareBitmap.CopyFromBuffer(pixelBuffer);
-
-        // Save SoftwareBitmap to file
-        await SaveSoftwareBitmapToFileAsync(softwareBitmap, filePath);
+        try
+        {
+            if (renderTargetBitmap.PixelWidth == 0 || renderTargetBitmap.PixelHeight == 0)
+            {
+                Debug.WriteLine($"[ERROR] The width and height are not a match for this asset. Try a different value other than {width},{height}.");
+            }
+            else
+            {
+                Windows.Graphics.Imaging.SoftwareBitmap softwareBitmap = new Windows.Graphics.Imaging.SoftwareBitmap(Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8, renderTargetBitmap.PixelWidth, renderTargetBitmap.PixelHeight, Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied);
+                softwareBitmap.CopyFromBuffer(pixelBuffer);
+                // Save SoftwareBitmap to file
+                await SaveSoftwareBitmapToFileAsync(softwareBitmap, filePath);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ERROR] SaveImageSourceToFileAsync: {ex.Message}");
+        }
     }
 
     /// <summary>

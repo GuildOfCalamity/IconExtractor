@@ -278,7 +278,7 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
                                                 try
                                                 {   // NOTE: When extracting icon assets from a DLL, the UriSource does not exist.
                                                     // In an effort to make this feature a reality, I've created a "alternative" approach.
-                                                    await BitmapHelper.SaveImageSourceToFileAsync(hostGrid, ImgSource, Path.Combine(AppContext.BaseDirectory, $"IconIndex{img.Index}.png"));
+                                                    await BitmapHelper.SaveImageSourceToFileAsync(hostGrid, ImgSource, Path.Combine(AppContext.BaseDirectory, $"IconIndex{img.Index}.png"), 32, 32);
                                                 }
                                                 catch (Exception ex) { Status = $"⚠️ Save: {ex.Message}"; }
                                             }
