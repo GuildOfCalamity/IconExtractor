@@ -158,8 +158,8 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
         }
     }
 
-    IconFileInfo _ShieldIconFileInfo;
-    public IconFileInfo ShieldIconFileInfo 
+    IconFileInfo? _ShieldIconFileInfo;
+    public IconFileInfo? ShieldIconFileInfo 
     {
         get
         {
@@ -180,8 +180,8 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
         }
     }
 
-    IconFileInfo _MonitorIconFileInfo;
-    public IconFileInfo MonitorIconFileInfo
+    IconFileInfo? _MonitorIconFileInfo;
+    public IconFileInfo? MonitorIconFileInfo
     {
         get
         {
@@ -246,7 +246,7 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
             IconItems.Clear();
 
             var request = Enumerable.Range(1, 3000).ToList();
-            Status = $"✔️ Checking {request.Count} indices...";
+            Status = $"🔔 Checking {request.Count} indices...";
             IList<IconFileInfo>? fullImageResList = null;
             var extraction = Task.Run(() =>
             {
