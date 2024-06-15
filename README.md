@@ -9,6 +9,8 @@
 	- "Vanara.Windows.Extensions" Version="4.0.1"
 	- "Vanara.Windows.Shell" Version="4.0.1"
 
+* You may need to adjust the width and height values based on the DLL you're targeting. Some assets have 16, 24, 32, 64, 128 and 256 representations and some do not.
+
 * On a side note, does anyone happen to know the story behond this icon? This isn't a rendering artifact; index #2866 in **comres.dll** seems like an internal prank to scribble/deface the asset. Was this done on purpose for some reason? Maybe the effect was to simulate being cracked in half? Out of the thousands of icons I inspected while making this project, only this one stood as an outlier.
 
 ![Example Picture](./ScreenShot2.png)
