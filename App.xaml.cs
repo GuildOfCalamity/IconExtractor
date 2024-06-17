@@ -30,8 +30,8 @@ namespace IconExtractor
     /// </summary>
     public partial class App : Application
     {
-        int m_width = 940;
-        int m_height = 700;
+        public static int m_width { get; set; } = 940;
+        public static int m_height { get; set; } = 700;
 
         private Window? m_window;
         public static IntPtr WindowHandle { get; set; }

@@ -14,6 +14,16 @@
 
             </ResourceDictionary.MergedDictionaries>
 
+            <!--#region [Converters]-->
+            <local:BooleanInverseConverter x:Key="BooleanInverter" />
+            <local:BooleanToVisibilityConverter x:Key="BooleanVisibility" />
+            <local:BooleanToOpacityConverter x:Key="BooleanOpacity" />
+            <local:BooleanToOpacityInverseConverter x:Key="BooleanOpacityInverse" />
+            <local:BooleanToVisibilityInverseConverter x:Key="BooleanVisibilityInverse" />
+            <local:StringFormatConverter x:Key="StringToFormat" />
+            <local:NumberToStringConverter x:Key="NumberToString" />
+            <!--#endregion-->
+
             <!--#region [Colors]-->
             <Color x:Key="NormalColor1">#606060</Color>
             <Color x:Key="NormalColor2">#474747</Color>

@@ -9,6 +9,7 @@
     xmlns:local="using:IconExtractor"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:models="using:IconExtractor.Models"
+    x:Name="hostPage"
     Background="Transparent"
     mc:Ignorable="d">
 
@@ -99,7 +100,7 @@
     <Grid x:Name="hostGrid">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="105" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -110,6 +111,9 @@
             VerticalAlignment="Center"
             Orientation="Horizontal"
             Spacing="15">
+            <!--
+                You can could change this to a TextBox and allow the user to enter the path of the DLL manually.
+            -->
             <ComboBox
                 MinWidth="200"
                 MaxWidth="200"
@@ -136,7 +140,7 @@
             </ComboBox>
 
             <TextBlock
-                Margin="5,0,0,7"
+                Margin="5,0,0,1"
                 VerticalAlignment="Bottom"
                 FontFamily="{ThemeResource PrimaryFont}"
                 FontSize="{ThemeResource FontSizeLarge}"
@@ -146,6 +150,7 @@
         </StackPanel>
 
         <StackPanel
+            x:Name="spControls"
             Grid.Row="1"
             Margin="15"
             HorizontalAlignment="Left"
@@ -196,9 +201,134 @@
                 </Button.Content>
             </Button>
 
-            <CheckBox Content="Save each icon to disk?" IsChecked="{x:Bind SaveToDisk, Mode=TwoWay}" />
-
+            <!--#region [Width and Height]-->
+            <CheckBox
+                Margin="0,0,10,0"
+                Content="Save each icon to disk"
+                IsChecked="{x:Bind SaveToDisk, Mode=TwoWay}" />
+            <TextBox
+                GotFocus="TextBox_GotFocus"
+                Text="{x:Bind TargetWidth, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                Visibility="{x:Bind SaveToDisk, Mode=OneWay, Converter={StaticResource BooleanVisibilityInverse}}">
+                <TextBox.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock
+                            Margin="1,0,0,-6"
+                            Foreground="{ThemeResource GradientTitleBrush}"
+                            Text="Desired width" />
+                        <ctrls:GridEx>
+                            <Image
+                                Width="16"
+                                Height="16"
+                                VerticalAlignment="Bottom"
+                                Source="ms-appx:///Assets/Info.png">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Background="{ThemeResource GradientToolTipBrush}">
+                                        <StackPanel
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            CornerRadius="5"
+                                            Orientation="Vertical">
+                                            <TextBlock FontSize="{ThemeResource FontSizeNormal}" Text="Some asset widths may not be available," />
+                                            <TextBlock FontSize="{ThemeResource FontSizeNormal}" Text="you'll have to experiment with these values." />
+                                            <TextBlock
+                                                FontSize="{ThemeResource FontSizeSmall}"
+                                                FontStyle="Italic"
+                                                Text="Typical values are 16, 24, 32, 64, 128 and 256." />
+                                        </StackPanel>
+                                    </ToolTip>
+                                </ToolTipService.ToolTip>
+                            </Image>
+                        </ctrls:GridEx>
+                    </StackPanel>
+                </TextBox.Header>
+            </TextBox>
+            <!--  https://symbl.cc/en/unicode-table/#dingbats  -->
+            <TextBlock
+                Margin="-9,0,-9,5"
+                VerticalAlignment="Bottom"
+                FontSize="{ThemeResource FontSizeNormal}"
+                Text="✖"
+                Visibility="{x:Bind SaveToDisk, Mode=OneWay, Converter={StaticResource BooleanVisibilityInverse}}" />
+            <TextBox
+                GotFocus="TextBox_GotFocus"
+                Text="{x:Bind TargetHeight, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                ToolTipService.ToolTip="Some asset heights may not be available"
+                Visibility="{x:Bind SaveToDisk, Mode=OneWay, Converter={StaticResource BooleanVisibilityInverse}}">
+                <TextBox.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock
+                            Margin="1,0,0,-6"
+                            Foreground="{ThemeResource GradientTitleBrush}"
+                            Text="Desired height" />
+                        <ctrls:GridEx>
+                            <Image
+                                Width="16"
+                                Height="16"
+                                VerticalAlignment="Bottom"
+                                Source="ms-appx:///Assets/Info.png">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Background="{ThemeResource GradientToolTipBrush}">
+                                        <StackPanel
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            CornerRadius="5"
+                                            Orientation="Vertical">
+                                            <TextBlock FontSize="{ThemeResource FontSizeNormal}" Text="Some asset heights may not be available," />
+                                            <TextBlock FontSize="{ThemeResource FontSizeNormal}" Text="you'll have to experiment with these values." />
+                                            <TextBlock
+                                                FontSize="{ThemeResource FontSizeSmall}"
+                                                FontStyle="Italic"
+                                                Text="Typical values are 16, 24, 32, 64, 128 and 256." />
+                                        </StackPanel>
+                                    </ToolTip>
+                                </ToolTipService.ToolTip>
+                            </Image>
+                        </ctrls:GridEx>
+                    </StackPanel>
+                </TextBox.Header>
+            </TextBox>
+            <!--#endregion-->
         </StackPanel>
+
+        <Image
+            Grid.Row="2"
+            Width="140"
+            Height="140"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Opacity="0.8"
+            Source="ms-appx:///Assets/Spinner.png"
+            Visibility="{x:Bind IsNotBusy, Mode=OneWay, Converter={StaticResource BooleanVisibility}}">
+            <Image.Resources>
+                <Storyboard
+                    x:Name="StoryboardPath"
+                    AutoReverse="False"
+                    RepeatBehavior="Forever">
+                    <DoubleAnimation
+                        x:Name="dblAnimation"
+                        Storyboard.TargetName="spinnerTransform"
+                        Storyboard.TargetProperty="Angle"
+                        From="0"
+                        To="360"
+                        Duration="0:00:01.25" />
+                </Storyboard>
+            </Image.Resources>
+            <Image.RenderTransform>
+                <RotateTransform x:Name="spinnerTransform" CenterX="69" CenterY="70" />
+            </Image.RenderTransform>
+        </Image>
+
+        <!--<Ellipse
+            Width="50"
+            Height="100"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center">
+            <Ellipse.Fill>
+                <ImageBrush ImageSource="ms-appx:///Assets/StoreLogo.png" />
+            </Ellipse.Fill>
+        </Ellipse>-->
+
 
         <ScrollViewer
             Grid.Row="2"

@@ -26,6 +26,9 @@ using IconExtractor.Support;
 using Windows.Storage.Streams;
 using Windows.Graphics.Imaging;
 using Windows.Storage;
+using System.Windows.Media.Media3D;
+using static Vanara.PInvoke.User32;
+using IconExtractor.Controls;
 
 namespace IconExtractor;
 
@@ -96,6 +99,28 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
         {
             _selectedDLLIndex = value;
             NotifyPropertyChanged(nameof(SelectedDLLIndex));
+        }
+    }
+
+    private string _targetWidth = "32";
+    public string TargetWidth
+    {
+        get => _targetWidth;
+        set
+        {
+            _targetWidth = value;
+            NotifyPropertyChanged(nameof(TargetWidth));
+        }
+    }
+
+    private string _targetHeight = "32";
+    public string TargetHeight
+    {
+        get => _targetHeight;
+        set
+        {
+            _targetHeight = value;
+            NotifyPropertyChanged(nameof(TargetHeight));
         }
     }
 
@@ -241,6 +266,7 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
                 return;
             }
 
+            StoryboardPath.Resume();
             IsBusy = true;
 
             IconItems.Clear();
@@ -277,8 +303,11 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
                                             {
                                                 try
                                                 {   // NOTE: When extracting icon assets from a DLL, the UriSource does not exist.
-                                                    // In an effort to make this feature a reality, I've created a "alternative" approach.
-                                                    await BitmapHelper.SaveImageSourceToFileAsync(hostGrid, ImgSource, Path.Combine(AppContext.BaseDirectory, $"IconIndex{img.Index}.png"), 32, 32);
+                                                    // In an effort to make this feature a reality, I've created an "alternative" approach.
+                                                    if (int.TryParse(TargetWidth, out int tw) && tw > 0 && int.TryParse(TargetHeight, out int th) && th > 0)
+                                                        await BitmapHelper.SaveImageSourceToFileAsync(hostGrid, ImgSource, Path.Combine(AppContext.BaseDirectory, $"IconIndex{img.Index}.png"), tw, th);
+                                                    else
+                                                        await BitmapHelper.SaveImageSourceToFileAsync(hostGrid, ImgSource, Path.Combine(AppContext.BaseDirectory, $"IconIndex{img.Index}.png"), 32, 32);
                                                 }
                                                 catch (Exception ex) { Status = $"⚠️ Save: {ex.Message}"; }
                                             }
@@ -303,59 +332,101 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
                 {
                     Status = $"⚠️ No results to show";
                 }
+
+                StoryboardPath.Pause();
+
+                _ = DispatcherQueue.TryEnqueue(async () =>
+                {
+                    // Give the UI time to update before saving screen shot.
+                    // Even 1 ms seems adequate, but I'll use 1 frame worth (approx 33 ms).
+                    await Task.Delay(30);
+                    await UpdateScreenshot(App.MainRoot ?? hostPage, null);
+                });
+
             });
         });
     }
 
     /// <summary>
-    /// https://learn.microsoft.com/en-us/windows/uwp/audio-video-camera/imaging
+    /// Apply a page's visual state to an <see cref="Microsoft.UI.Xaml.Controls.Image"/> source. 
+    /// If the target is null then the image is saved to disk.
     /// </summary>
-    async void SaveSoftwareBitmapToFile(SoftwareBitmap softwareBitmap, StorageFile outputFile)
+    /// <param name="root">host <see cref="Microsoft.UI.Xaml.UIElement"/>. Can be a grid, a page, etc.</param>
+    /// <param name="target">optional <see cref="Microsoft.UI.Xaml.Controls.Image"/> target</param>
+    /// <remarks>
+    /// Using a RenderTargetBitmap, you can accomplish scenarios such as applying image effects to a visual that 
+    /// originally came from a XAML UI composition, generating thumbnail images of child pages for a navigation 
+    /// system, or enabling the user to save parts of the UI as an image source and then share that image with 
+    /// other applications. 
+    /// Because RenderTargetBitmap is a subclass of <see cref="Microsoft.UI.Xaml.Media.ImageSource"/>, 
+    /// it can be used as the image source for <see cref="Microsoft.UI.Xaml.Controls.Image"/> elements or an 
+    /// <see cref="Microsoft.UI.Xaml.Media.ImageBrush"/> brush. 
+    /// Calling RenderAsync() provides a useful image source but the full buffer representation of rendering 
+    /// content is not copied out of video memory until the app calls GetPixelsAsync().
+    /// It is faster to call RenderAsync() only, without calling GetPixelsAsync, and use the RenderTargetBitmap as an 
+    /// <see cref="Microsoft.UI.Xaml.Controls.Image"/> or <see cref="Microsoft.UI.Xaml.Media.ImageBrush"/> 
+    /// source if the app only intends to display the rendered content and does not need the pixel data. 
+    /// [Stipulations]
+    ///  - Content that's in the tree but with its Visibility set to Collapsed won't be captured.
+    ///  - Content that's not directly connected to the XAML visual tree and the content of the main window won't be captured. This includes Popup content, which is considered to be like a sub-window.
+    ///  - Content that can't be captured will appear as blank in the captured image, but other content in the same visual tree can still be captured and will render (the presence of content that can't be captured won't invalidate the entire capture of that XAML composition).
+    ///  - Content that's in the XAML visual tree but offscreen can be captured, so long as it's not Visibility = Collapsed.
+    /// https://learn.microsoft.com/en-us/uwp/api/windows.ui.xaml.media.imaging.rendertargetbitmap?view=winrt-22621
+    /// </remarks>
+    async Task UpdateScreenshot(Microsoft.UI.Xaml.UIElement root, Microsoft.UI.Xaml.Controls.Image? target)
     {
-        using (IRandomAccessStream stream = await outputFile.OpenAsync(FileAccessMode.ReadWrite))
+        Microsoft.UI.Xaml.Media.Imaging.RenderTargetBitmap renderTargetBitmap = new();
+        await renderTargetBitmap.RenderAsync(root, App.m_width, App.m_height);
+        if (target is not null)
         {
-            // Create an encoder with the desired format
-            BitmapEncoder encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, stream);
-
-            // Set the software bitmap
-            encoder.SetSoftwareBitmap(softwareBitmap);
-
-            // Set additional encoding parameters, if needed
-            //encoder.BitmapTransform.ScaledWidth = 320;
-            //encoder.BitmapTransform.ScaledHeight = 240;
-            //encoder.BitmapTransform.Rotation = Windows.Graphics.Imaging.BitmapRotation.Clockwise90Degrees;
-            //encoder.BitmapTransform.InterpolationMode = BitmapInterpolationMode.Fant;
-            //encoder.IsThumbnailGenerated = true;
-
-            try
+            // A render target bitmap is a viable ImageSource.
+            imgCycle.Source = renderTargetBitmap;
+        }
+        else
+        {
+            // Convert RenderTargetBitmap to SoftwareBitmap
+            IBuffer pixelBuffer = await renderTargetBitmap.GetPixelsAsync();
+            byte[] pixels = pixelBuffer.ToArray();
+            if (pixels.Length == 0 || renderTargetBitmap.PixelWidth == 0 || renderTargetBitmap.PixelHeight == 0)
             {
-                await encoder.FlushAsync();
+                Debug.WriteLine($"[ERROR] The width and height are not valid, cannot save.");
             }
-            catch (Exception ex)
+            else
             {
-                const int WINCODEC_ERR_UNSUPPORTEDOPERATION = unchecked((int)0x88982F81);
-                switch (ex.HResult)
-                {
-                    case WINCODEC_ERR_UNSUPPORTEDOPERATION:
-                        // If the encoder does not support writing a thumbnail, then try again
-                        // but disable thumbnail generation.
-                        encoder.IsThumbnailGenerated = false;
-                        break;
-                    default:
-                        throw;
-                }
-            }
-
-            if (encoder.IsThumbnailGenerated == false)
-            {
-                await encoder.FlushAsync();
+                Windows.Graphics.Imaging.SoftwareBitmap softwareBitmap = new Windows.Graphics.Imaging.SoftwareBitmap(Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8, renderTargetBitmap.PixelWidth, renderTargetBitmap.PixelHeight, Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied);
+                softwareBitmap.CopyFromBuffer(pixelBuffer);
+                await BitmapHelper.SaveSoftwareBitmapToFileAsync(softwareBitmap, Path.Combine(AppContext.BaseDirectory, $"{App.GetCurrentNamespace()}Screenshot.png"));
+                softwareBitmap.Dispose();
             }
         }
     }
 
+    async Task<RandomAccessStreamReference> GetRandomAccessStreamFromUIElement(UIElement? element)
+    {
+        Microsoft.UI.Xaml.Media.Imaging.RenderTargetBitmap renderTargetBitmap = new();
+        InMemoryRandomAccessStream stream = new InMemoryRandomAccessStream();
+        // Render to an image at the current system scale and retrieve pixel contents
+        await renderTargetBitmap.RenderAsync(element ?? hostPage);
+        var pixelBuffer = await renderTargetBitmap.GetPixelsAsync();
+        // Encode image to an in-memory stream.
+        var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, stream);
+        encoder.SetPixelData(
+            BitmapPixelFormat.Bgra8,
+            BitmapAlphaMode.Ignore,
+            (uint)renderTargetBitmap.PixelWidth,
+            (uint)renderTargetBitmap.PixelHeight,
+            96d,
+            96d,
+            pixelBuffer.ToArray());
+        await encoder.FlushAsync();
+        // Set content to the encoded image in memory.
+        return RandomAccessStreamReference.CreateFromStream(stream);
+    }
+
     void ItemsGridViewOnLoaded(object sender, RoutedEventArgs e)
     {
-        // Delegate loading of icons, so we have smooth navigating to this page and do not unnecessarily block the UI thread.
+        // Delegate loading of icons, so we have smooth navigating to
+        // this page and do not unnecessarily block the UI thread.
         Task.Run(delegate ()
         {
             _ = DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.High, () =>
@@ -366,7 +437,42 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
 
         _loaded = true;
         TargetDLL = dlls[0];
-        Status = "✔️ System ready";
+        Status = "✔️ Ready";
+        StoryboardPath.Begin();
+        StoryboardPath.Pause();
+
+        #region [Manipulatable Container Test]
+        //Image img = new Image 
+        //{
+        //    Opacity = 0.8d,
+        //    Width = 40,
+        //    Height = 40,
+        //    Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri("ms-appx:///Assets/StoreLogo.png", UriKind.RelativeOrAbsolute)), 
+        //};
+        //Button btn = new Button
+        //{
+        //    Width = 54,
+        //    Height = 54,
+        //    Padding = new Thickness(0),
+        //    VerticalAlignment = VerticalAlignment.Bottom,
+        //    HorizontalAlignment = HorizontalAlignment.Right,
+        //    Content = img,
+        //};
+        //btn.Click += (_, _) => { Status = "you clicked me"; };
+        //ToolTipService.SetToolTip(btn, "drag me around");
+        //AddManipulatableElement(btn);
+        #endregion
+    }
+
+    /// <summary>
+    /// Makes an element manipulatable and adds it to the host grid.
+    /// </summary>
+    /// <param name="element"><see cref="UIElement"/></param>
+    void AddManipulatableElement(UIElement element)
+    {
+        ManipulatableContainer container = new ManipulatableContainer();
+        container.Content = element;
+        hostGrid.Children.Add(container);
     }
 
     void IconsOnTemplatePointerPressed(object sender, PointerRoutedEventArgs e)
@@ -418,6 +524,12 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
                 Debug.WriteLine($"[ERROR] SelectionChanged: {ex.Message}");
             }
         }
+    }
+
+    void TextBox_GotFocus(object sender, RoutedEventArgs e)
+    {
+        var tb = sender as TextBox;
+        tb?.SelectAll();
     }
 }
 

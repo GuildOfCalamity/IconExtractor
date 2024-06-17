@@ -63,6 +63,7 @@
   <ItemGroup>
     <None Remove="Assets\Fonts\Aptos.ttf" />
     <None Remove="Assets\Fonts\Aptos_Mono.ttf" />
+    <None Remove="Assets\Info.png" />
     <None Remove="MainPage.xaml" />
     <None Remove="Styles\FontSizes.xaml" />
   </ItemGroup>

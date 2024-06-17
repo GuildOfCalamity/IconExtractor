@@ -90,6 +90,7 @@ internal static class BitmapHelper
     #region [New Technique]
     /// <summary>
     /// This was not trivial and proved to be a challenge.
+    /// The main issue is the UriSource. Because we're extracting the asset from a DLL, the UriSource is null which immediately limits our options.
     /// I'm sure someone will correct my misadventure, but this works — and you can't argue with results.
     /// </summary>
     /// <param name="hostGrid"><see cref="Microsoft.UI.Xaml.Controls.Grid"/> to serve as the liaison.</param>
@@ -97,7 +98,15 @@ internal static class BitmapHelper
     /// <param name="filePath">The full path to write the image.</param>
     /// <param name="width">16 to 256</param>
     /// <param name="height">16 to 256</param>
-    /// <remarks>If the width or height is not correct then the </remarks>
+    /// <remarks>
+    /// If the width or height is not correct the render target cannot be saved.
+    /// The following types derive from <see cref="Microsoft.UI.Xaml.Media.ImageSource"/>:
+    ///  - <see cref="Microsoft.UI.Xaml.Media.Imaging.BitmapSource"/>
+    ///  - <see cref="Microsoft.UI.Xaml.Media.Imaging.RenderTargetBitmap"/>
+    ///  - <see cref="Microsoft.UI.Xaml.Media.Imaging.SoftwareBitmapSource"/>
+    ///  - <see cref="Microsoft.UI.Xaml.Media.Imaging.SurfaceImageSource"/>
+    ///  - <see cref="Microsoft.UI.Xaml.Media.Imaging.SvgImageSource"/>
+    /// </remarks>
     public static async Task SaveImageSourceToFileAsync(Microsoft.UI.Xaml.Controls.Grid hostGrid, Microsoft.UI.Xaml.Media.ImageSource imageSource, string filePath, int width = 32, int height = 32)
     {
         // Create an Image control to hold the ImageSource
@@ -110,7 +119,7 @@ internal static class BitmapHelper
 
         // NOTE: This is super clunky, but for some reason the Image resource is
         // never fully created if it's not appended to a rendered host control.
-        // As a workaround we'll add the Image control to the host Grid.
+        // As a workaround we'll add the Image control to the host Grid. ┐( ˘_˘ )┌
         hostGrid.Children.Add(imageControl);
 
         // Wait for the image to be loaded and rendered
@@ -129,16 +138,22 @@ internal static class BitmapHelper
 
         try
         {
-            if (renderTargetBitmap.PixelWidth == 0 || renderTargetBitmap.PixelHeight == 0)
+            if (pixels.Length == 0 || renderTargetBitmap.PixelWidth == 0 || renderTargetBitmap.PixelHeight == 0)
             {
                 Debug.WriteLine($"[ERROR] The width and height are not a match for this asset. Try a different value other than {width},{height}.");
             }
             else
             {
-                Windows.Graphics.Imaging.SoftwareBitmap softwareBitmap = new Windows.Graphics.Imaging.SoftwareBitmap(Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8, renderTargetBitmap.PixelWidth, renderTargetBitmap.PixelHeight, Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied);
+                // NOTE: A SoftwareBitmap displayed in a XAML app must be in BGRA pixel format with pre-multiplied alpha values.
+                Windows.Graphics.Imaging.SoftwareBitmap softwareBitmap = new Windows.Graphics.Imaging.SoftwareBitmap(
+                    Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8, 
+                    renderTargetBitmap.PixelWidth, 
+                    renderTargetBitmap.PixelHeight, 
+                    Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied);
                 softwareBitmap.CopyFromBuffer(pixelBuffer);
                 // Save SoftwareBitmap to file
                 await SaveSoftwareBitmapToFileAsync(softwareBitmap, filePath);
+                softwareBitmap.Dispose();
             }
         }
         catch (Exception ex)
@@ -153,7 +168,7 @@ internal static class BitmapHelper
     /// <remarks>
     /// Assumes <see cref="Windows.Graphics.Imaging.BitmapEncoder.PngEncoderId"/>.
     /// </remarks>
-    static async Task SaveSoftwareBitmapToFileAsync(Windows.Graphics.Imaging.SoftwareBitmap softwareBitmap, string filePath)
+    public static async Task SaveSoftwareBitmapToFileAsync(Windows.Graphics.Imaging.SoftwareBitmap softwareBitmap, string filePath)
     {
         if (File.Exists(filePath))
         {
@@ -167,16 +182,62 @@ internal static class BitmapHelper
         }
         else
         {
-            // Get the folder and file name from the file path
+            // Get the folder and file name from the file path.
             string? folderPath = System.IO.Path.GetDirectoryName(filePath);
             string? fileName = System.IO.Path.GetFileName(filePath);
-            // Create the folder if it does not exist
+            // Create the folder if it does not exist.
             Windows.Storage.StorageFolder storageFolder = await Windows.Storage.StorageFolder.GetFolderFromPathAsync(folderPath);
             Windows.Storage.StorageFile file = await storageFolder.CreateFileAsync(fileName, Windows.Storage.CreationCollisionOption.ReplaceExisting);
             using (Windows.Storage.Streams.IRandomAccessStream stream = await file.OpenAsync(Windows.Storage.FileAccessMode.ReadWrite))
             {
                 Windows.Graphics.Imaging.BitmapEncoder encoder = await Windows.Graphics.Imaging.BitmapEncoder.CreateAsync(Windows.Graphics.Imaging.BitmapEncoder.PngEncoderId, stream);
                 encoder.SetSoftwareBitmap(softwareBitmap);
+                await encoder.FlushAsync();
+            }
+        }
+    }
+
+    /// <summary>
+    /// https://learn.microsoft.com/en-us/windows/uwp/audio-video-camera/imaging
+    /// </summary>
+    static async void SaveSoftwareBitmapToFileExample(SoftwareBitmap softwareBitmap, StorageFile outputFile)
+    {
+        using (IRandomAccessStream stream = await outputFile.OpenAsync(FileAccessMode.ReadWrite))
+        {
+            // Create an encoder with the desired format
+            BitmapEncoder encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, stream);
+
+            // Set the software bitmap
+            encoder.SetSoftwareBitmap(softwareBitmap);
+
+            // Set additional encoding parameters, if needed
+            //encoder.BitmapTransform.ScaledWidth = 320;
+            //encoder.BitmapTransform.ScaledHeight = 240;
+            //encoder.BitmapTransform.Rotation = Windows.Graphics.Imaging.BitmapRotation.Clockwise90Degrees;
+            //encoder.BitmapTransform.InterpolationMode = BitmapInterpolationMode.Fant;
+            //encoder.IsThumbnailGenerated = true;
+
+            try
+            {
+                await encoder.FlushAsync();
+            }
+            catch (Exception ex)
+            {
+                const int WINCODEC_ERR_UNSUPPORTEDOPERATION = unchecked((int)0x88982F81);
+                switch (ex.HResult)
+                {
+                    case WINCODEC_ERR_UNSUPPORTEDOPERATION:
+                        // If the encoder does not support writing a thumbnail, then try again
+                        // but disable thumbnail generation.
+                        encoder.IsThumbnailGenerated = false;
+                        break;
+                    default:
+                        throw;
+                }
+            }
+
+            if (encoder.IsThumbnailGenerated == false)
+            {
                 await encoder.FlushAsync();
             }
         }
@@ -216,7 +277,7 @@ internal static class BitmapHelper
 
         // NOTE: This is super clunky, but for some reason the Image resource is
         // never fully created if it's not appended to a rendered host control.
-        // As a workaround we'll add the Image control to the host Grid.
+        // As a workaround we'll add the Image control to the host Grid. ┐( ˘_˘ )┌
         hostGrid.Children.Add(imageControl);
 
         // Wait for the image to be loaded
@@ -231,7 +292,7 @@ internal static class BitmapHelper
         IBuffer pixelBuffer = await renderTargetBitmap.GetPixelsAsync();
         byte[] pixels = pixelBuffer.ToArray();
 
-        // Configure the software bitmap
+        // NOTE: A SoftwareBitmap displayed in a XAML app must be in BGRA pixel format with pre-multiplied alpha values.
         Windows.Graphics.Imaging.SoftwareBitmap softwareBitmap = new Windows.Graphics.Imaging.SoftwareBitmap(
             Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8, 
             renderTargetBitmap.PixelWidth, 
@@ -241,10 +302,24 @@ internal static class BitmapHelper
         // Remove the Image control from the host Grid
         hostGrid.Children.Remove(imageControl);
 
-        softwareBitmap.CopyFromBuffer(pixelBuffer);
-
-        // Save SoftwareBitmap to file
-        await SaveSoftwareBitmapToFileAsync(softwareBitmap, filePath);
+        try
+        {
+            if (pixels.Length == 0 || renderTargetBitmap.PixelWidth == 0 || renderTargetBitmap.PixelHeight == 0)
+            {
+                Debug.WriteLine($"[ERROR] The width and height are not a match for this asset. Try a different value other than {width},{height}.");
+            }
+            else
+            {
+                softwareBitmap.CopyFromBuffer(pixelBuffer);
+                // Save SoftwareBitmap to file
+                await SaveSoftwareBitmapToFileAsync(softwareBitmap, filePath);
+                softwareBitmap.Dispose();
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ERROR] SaveBitmapImageToFileAsyncAlt: {ex.Message}");
+        }
     }
     #endregion
 
@@ -307,6 +382,7 @@ internal static class BitmapHelper
             Stream pixelStream = bitmapImage.ToStream();
             byte[] pixels = new byte[pixelStream.Length];
             await pixelStream.ReadAsync(pixels, 0, pixels.Length);
+            // NOTE: A SoftwareBitmap displayed in a XAML app must be in BGRA pixel format with pre-multiplied alpha values.
             encoder.SetPixelData(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied, (uint)bitmapImage.PixelWidth, (uint)bitmapImage.PixelHeight, 96.0, 96.0, pixels);
             await encoder.FlushAsync();
             // Decode the image to a SoftwareBitmap
