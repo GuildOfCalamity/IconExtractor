@@ -21,6 +21,44 @@ using System.Diagnostics;
 
 namespace IconExtractor.Support;
 
+/// <summary>
+/// Provides the practical object source type for the Image.Source and ImageBrush.ImageSource properties. 
+/// You can define a BitmapImage by using a Uniform Resource Identifier (URI) that references an image 
+/// source file, or by calling SetSourceAsync and supplying a stream.
+/// https://learn.microsoft.com/en-us/uwp/api/windows.ui.xaml.media.imaging.bitmapimage?view=winrt-22621
+/// A BitmapImage can be sourced from these image file formats:
+/// - Joint Photographic Experts Group (JPEG)
+/// - Portable Network Graphics (PNG)
+/// - Bitmap (BMP)
+/// - Graphics Interchange Format (GIF)
+/// - Tagged Image File Format (TIFF)
+/// - JPEG XR
+/// - Icon (ICO)
+/// </summary>
+/// <remarks>
+/// If the image source is a stream, that stream is expected to contain an image file in one of these formats.
+/// The BitmapImage class represents an abstraction so that an image source can be set asynchronously but still 
+/// be referenced in XAML markup as a property value, or in code as an object that doesn't use awaitable syntax. 
+/// When you create a BitmapImage object in code, it initially has no valid source. You should then set its source 
+/// using one of these techniques:
+/// Use the BitmapImage(Uri) constructor rather than the default constructor. Although it's a constructor you can 
+/// think of this as having an implicit asynchronous behavior: the BitmapImage won't be ready for use until it 
+/// raises an ImageOpened event that indicates a successful async source set operation.
+/// Set the UriSource property. As with using the Uri constructor, this action is implicitly asynchronous, and the 
+/// BitmapImage won't be ready for use until it raises an ImageOpened event.
+/// Use SetSourceAsync. This method is explicitly asynchronous. The properties where you might use a BitmapImage, 
+/// such as Image.Source, are designed for this asynchronous behavior, and won't throw exceptions if they are set 
+/// using a BitmapImage that doesn't have a complete source yet. Rather than handling exceptions, you should handle 
+/// ImageOpened or ImageFailed events either on the BitmapImage directly or on the control that uses the source 
+/// (if those events are available on the control class).
+/// ImageFailed and ImageOpened are mutually exclusive. One event or the other will always be raised whenever a 
+/// BitmapImage object has its source value set or reset.
+/// The API for Image, BitmapImage and BitmapSource doesn't include any dedicated methods for encoding and decoding 
+/// of media formats. All of the encode and decode operations are built-in, and at most will surface aspects of 
+/// encode or decode as part of event data for load events. 
+/// If you want to do any special work with image encode or decode, which you might use if your app is doing image 
+/// conversions or manipulation, you should use the API that are available in the Windows.Graphics.Imaging namespace.
+/// </remarks>
 internal static class BitmapHelper
 {
     public static async Task<Microsoft.UI.Xaml.Media.Imaging.BitmapImage?> ToBitmapAsync(this byte[]? data, int decodeSize = -1)
@@ -28,7 +66,8 @@ internal static class BitmapHelper
         if (data is null)
             return null;
 
-        try {
+        try 
+        {
             using var ms = new MemoryStream(data);
             var image = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
             if (decodeSize > 0)
@@ -152,7 +191,7 @@ internal static class BitmapHelper
                     Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied);
                 softwareBitmap.CopyFromBuffer(pixelBuffer);
                 // Save SoftwareBitmap to file
-                await SaveSoftwareBitmapToFileAsync(softwareBitmap, filePath);
+                await softwareBitmap.SaveSoftwareBitmapToFileAsync(filePath, Windows.Graphics.Imaging.BitmapInterpolationMode.NearestNeighbor);
                 softwareBitmap.Dispose();
             }
         }
@@ -165,10 +204,18 @@ internal static class BitmapHelper
     /// <summary>
     /// Uses a <see cref="Windows.Graphics.Imaging.BitmapEncoder"/> to save the output.
     /// </summary>
+    /// <param name="softwareBitmap"><see cref="Windows.Graphics.Imaging.SoftwareBitmap"/></param>
+    /// <param name="filePath">output file path to save</param>
+    /// <param name="interpolation">In general, moving from NearestNeighbor to Fant, interpolation quality increases while performance decreases.</param>
     /// <remarks>
     /// Assumes <see cref="Windows.Graphics.Imaging.BitmapEncoder.PngEncoderId"/>.
+    /// [Windows.Graphics.Imaging.BitmapInterpolationMode]
+    /// 3 Fant...........: A Fant resampling algorithm. Destination pixel values are computed as a weighted average of the all the pixels that map to the new pixel in a box shaped kernel.
+    /// 2 Cubic..........: A bicubic interpolation algorithm. Destination pixel values are computed as a weighted average of the nearest sixteen pixels in a 4x4 grid.
+    /// 1 Linear.........: A bilinear interpolation algorithm. The output pixel values are computed as a weighted average of the nearest four pixels in a 2x2 grid.
+    /// 0 NearestNeighbor: A nearest neighbor interpolation algorithm. Also known as nearest pixel or point interpolation. The output pixel is assigned the value of the pixel that the point falls within. No other pixels are considered.
     /// </remarks>
-    public static async Task SaveSoftwareBitmapToFileAsync(Windows.Graphics.Imaging.SoftwareBitmap softwareBitmap, string filePath)
+    public static async Task SaveSoftwareBitmapToFileAsync(this Windows.Graphics.Imaging.SoftwareBitmap softwareBitmap, string filePath, Windows.Graphics.Imaging.BitmapInterpolationMode interpolation = Windows.Graphics.Imaging.BitmapInterpolationMode.Fant)
     {
         if (File.Exists(filePath))
         {
@@ -177,7 +224,15 @@ internal static class BitmapHelper
             {
                 Windows.Graphics.Imaging.BitmapEncoder encoder = await Windows.Graphics.Imaging.BitmapEncoder.CreateAsync(Windows.Graphics.Imaging.BitmapEncoder.PngEncoderId, stream);
                 encoder.SetSoftwareBitmap(softwareBitmap);
-                await encoder.FlushAsync();
+                encoder.BitmapTransform.InterpolationMode = interpolation;
+                try
+                {
+                    await encoder.FlushAsync();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[ERROR] SaveSoftwareBitmapToFileAsync({ex.HResult}): {ex.Message}");
+                }
             }
         }
         else
@@ -192,7 +247,15 @@ internal static class BitmapHelper
             {
                 Windows.Graphics.Imaging.BitmapEncoder encoder = await Windows.Graphics.Imaging.BitmapEncoder.CreateAsync(Windows.Graphics.Imaging.BitmapEncoder.PngEncoderId, stream);
                 encoder.SetSoftwareBitmap(softwareBitmap);
-                await encoder.FlushAsync();
+                encoder.BitmapTransform.InterpolationMode = interpolation;
+                try
+                {
+                    await encoder.FlushAsync();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[ERROR] SaveSoftwareBitmapToFileAsync({ex.HResult}): {ex.Message}");
+                }
             }
         }
     }
@@ -312,7 +375,7 @@ internal static class BitmapHelper
             {
                 softwareBitmap.CopyFromBuffer(pixelBuffer);
                 // Save SoftwareBitmap to file
-                await SaveSoftwareBitmapToFileAsync(softwareBitmap, filePath);
+                await softwareBitmap.SaveSoftwareBitmapToFileAsync(filePath, Windows.Graphics.Imaging.BitmapInterpolationMode.Fant);
                 softwareBitmap.Dispose();
             }
         }

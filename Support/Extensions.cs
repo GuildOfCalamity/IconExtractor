@@ -246,6 +246,33 @@ public static class Extensions
         return results;
     }
 
+    /// <summary>
+    /// An updated string truncation helper.
+    /// </summary>
+    /// <remarks>
+    /// This can be helpful when the CharacterEllipsis TextTrimming Property is not available.
+    /// </remarks>
+    public static string Truncate(this string text, int maxLength, string mesial = "…")
+    {
+        if (string.IsNullOrEmpty(text))
+            return string.Empty;
+
+        if (maxLength > 0 && text.Length > maxLength)
+        {
+            var limit = maxLength / 2;
+            if (limit > 1)
+            {
+                return String.Format("{0}{1}{2}", text.Substring(0, limit).Trim(), mesial, text.Substring(text.Length - limit).Trim());
+            }
+            else
+            {
+                var tmp = text.Length <= maxLength ? text : text.Substring(0, maxLength).Trim();
+                return String.Format("{0}{1}", tmp, mesial);
+            }
+        }
+        return text;
+    }
+
     public static string NameOf(this object obj) => $"{obj.GetType().Name} => {obj.GetType().BaseType?.Name}";
 }
 

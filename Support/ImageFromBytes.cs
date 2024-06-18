@@ -28,7 +28,7 @@ public sealed class ImageFromBytes : DependencyObject
             typeof(ImageFromBytes),
             new PropertyMetadata(null, OnSourceBytesChangedAsync));
 
-    private static async void OnSourceBytesChangedAsync(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    static async void OnSourceBytesChangedAsync(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         if (d is Image image)
         {

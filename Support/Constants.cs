@@ -31,6 +31,8 @@ public static class Constants
         public const int Libraries = 1023;
         public const int Folder = 3;
         public const int ShieldIcon = 78;
+        public const int Landscape = 72;
+        public const int Search = 8;
     }
 
     /// <summary>

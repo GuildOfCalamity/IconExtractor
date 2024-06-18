@@ -167,7 +167,7 @@
                         <Image
                             Width="24"
                             Height="24"
-                            helpers:ImageFromBytes.SourceBytes="{x:Bind MonitorIconFileInfo.IconData, Mode=OneWay}" />
+                            helpers:ImageFromBytes.SourceBytes="{x:Bind SearchIconFileInfo.IconData, Mode=OneWay}" />
                         <!--  Example of applying icon data directly to image control in XAML.  -->
                         <TextBlock
                             VerticalAlignment="Center"
@@ -184,13 +184,13 @@
                 Margin="3"
                 Source="{x:Bind ImgSource, Mode=OneWay}" />
 
-            <Button Style="{ThemeResource EnhancedButton}">
+            <Button Command="{x:Bind TestCommand, Mode=OneWay}" Style="{ThemeResource EnhancedButton}">
                 <Button.Content>
                     <StackPanel Orientation="Horizontal" Spacing="9">
                         <Image
                             Width="24"
                             Height="24"
-                            helpers:ImageFromBytes.SourceBytes="{x:Bind ShieldIconFileInfo.IconData, Mode=OneWay}" />
+                            helpers:ImageFromBytes.SourceBytes="{x:Bind LandscapeIconFileInfo.IconData, Mode=OneWay}" />
                         <!--  Example of applying icon data directly to image control in XAML.  -->
                         <TextBlock
                             VerticalAlignment="Center"
@@ -311,7 +311,7 @@
                         Storyboard.TargetProperty="Angle"
                         From="0"
                         To="360"
-                        Duration="0:00:01.25" />
+                        Duration="0:00:01.2" />
                 </Storyboard>
             </Image.Resources>
             <Image.RenderTransform>

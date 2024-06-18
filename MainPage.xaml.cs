@@ -20,15 +20,14 @@ using Microsoft.UI.Xaml.Navigation;
 
 using Windows.Foundation;
 using Windows.Foundation.Collections;
-
-using IconExtractor.Models;
-using IconExtractor.Support;
 using Windows.Storage.Streams;
 using Windows.Graphics.Imaging;
 using Windows.Storage;
-using System.Windows.Media.Media3D;
-using static Vanara.PInvoke.User32;
+
+using IconExtractor.Models;
+using IconExtractor.Support;
 using IconExtractor.Controls;
+using System.Runtime.InteropServices;
 
 namespace IconExtractor;
 
@@ -205,6 +204,28 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
         }
     }
 
+    IconFileInfo? _LandscapeIconFileInfo;
+    public IconFileInfo? LandscapeIconFileInfo
+    {
+        get
+        {
+            if (_LandscapeIconFileInfo is null)
+            {
+                var imageResList = Extensions.ExtractSelectedIconsFromDLL(
+                    imageresPath,
+                new List<int>() { Constants.ImageRes.Desktop },
+                24);
+                _LandscapeIconFileInfo = imageResList.First();
+            }
+            return _LandscapeIconFileInfo;
+        }
+        set
+        {
+            _LandscapeIconFileInfo = value;
+            NotifyPropertyChanged(nameof(LandscapeIconFileInfo));
+        }
+    }
+
     IconFileInfo? _MonitorIconFileInfo;
     public IconFileInfo? MonitorIconFileInfo
     {
@@ -224,6 +245,28 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
         {
             _MonitorIconFileInfo = value;
             NotifyPropertyChanged(nameof(MonitorIconFileInfo));
+        }
+    }
+    
+    IconFileInfo? _SearchIconFileInfo;
+    public IconFileInfo? SearchIconFileInfo
+    {
+        get
+        {
+            if (_SearchIconFileInfo is null)
+            {
+                var imageResList = Extensions.ExtractSelectedIconsFromDLL(
+                    imageresPath,
+                new List<int>() { Constants.ImageRes.Search },
+                24);
+                _SearchIconFileInfo = imageResList.First();
+            }
+            return _SearchIconFileInfo;
+        }
+        set
+        {
+            _SearchIconFileInfo = value;
+            NotifyPropertyChanged(nameof(SearchIconFileInfo));
         }
     }
     public string imageresPath { get; private set; }= System.IO.Path.Combine(Constants.UserEnvironmentPaths.SystemRootPath, "System32", "imageres.dll");
@@ -250,6 +293,7 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
     #endregion
 
     public ICommand TraverseCommand { get; }
+    public ICommand TestCommand { get; }
 
     public MainPage()
     {
@@ -272,7 +316,7 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
             IconItems.Clear();
 
             var request = Enumerable.Range(1, 3000).ToList();
-            Status = $"🔔 Checking {request.Count} indices...";
+            Status = $"🔔 Checking {request.Count} indices…";
             IList<IconFileInfo>? fullImageResList = null;
             var extraction = Task.Run(() =>
             {
@@ -337,13 +381,39 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
 
                 _ = DispatcherQueue.TryEnqueue(async () =>
                 {
-                    // Give the UI time to update before saving screen shot.
-                    // Even 1 ms seems adequate, but I'll use 1 frame worth (approx 33 ms).
-                    await Task.Delay(30);
+                    // Give the UI time to update before saving screen shot. 1ms is adequate, but
+                    // I want plenty of time to pass so the temporary host grid image is no more.
+                    await Task.Delay(500);
                     await UpdateScreenshot(App.MainRoot ?? hostPage, null);
+                    if (SaveToDisk)
+                    {
+                        await App.ShowDialogBox("Assets", $"Icons have been saved to ⇒ {Environment.NewLine}{Environment.NewLine}{AppContext.BaseDirectory}", "OK", "", null, null, new Uri($"ms-appx:///Assets/Info.png"));
+                    }
                 });
 
             });
+        });
+
+
+        // Desktop wallpaper refresh.
+        TestCommand = new RelayCommand<object>((obj) => 
+        {
+            var imgPath = Path.Combine(AppContext.BaseDirectory, $"{App.GetCurrentNamespace()}Screenshot.png");
+            if (File.Exists(imgPath))
+            {
+                // Changes wallpaper to latest screenshot.
+                _ = App.ShowDialogBox(
+                    "Wallpaper Change",
+                    $"Are you sure you want to change your desktop wallpaper?{Environment.NewLine}{Environment.NewLine}{imgPath.Truncate(51)}",
+                    "Yes",
+                    "Cancel",
+                    () => { _ = SystemParametersInfo(SPI_SETDESKWALLPAPER, 0, imgPath, SPIF_UPDATEINIFILE); Status = "🔔 Wallpaper change accepted by user"; },
+                    () => { Status = "🔔 Wallpaper change canceled by user"; },
+                    new Uri($"ms-appx:///Assets/Question.png"));
+            }
+            uint result = 99;
+            _ = SystemParametersInfo(SPI_GETFASTTASKSWITCH, 0, ref result, SPIF_UPDATEINIFILE);
+            Status = $"{(result == 0 ? "Alt-Tab task switching is disabled" : "Alt-Tab task switching is enabled")}";
         });
     }
 
@@ -395,7 +465,7 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
             {
                 Windows.Graphics.Imaging.SoftwareBitmap softwareBitmap = new Windows.Graphics.Imaging.SoftwareBitmap(Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8, renderTargetBitmap.PixelWidth, renderTargetBitmap.PixelHeight, Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied);
                 softwareBitmap.CopyFromBuffer(pixelBuffer);
-                await BitmapHelper.SaveSoftwareBitmapToFileAsync(softwareBitmap, Path.Combine(AppContext.BaseDirectory, $"{App.GetCurrentNamespace()}Screenshot.png"));
+                await softwareBitmap.SaveSoftwareBitmapToFileAsync(Path.Combine(AppContext.BaseDirectory, $"{App.GetCurrentNamespace()}Screenshot.png"), Windows.Graphics.Imaging.BitmapInterpolationMode.NearestNeighbor);
                 softwareBitmap.Dispose();
             }
         }
@@ -427,6 +497,9 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
     {
         // Delegate loading of icons, so we have smooth navigating to
         // this page and do not unnecessarily block the UI thread.
+        // On startup there won't be anything in the collection, but
+        // in the event that you decide to load a large number of
+        // items from disk, this will facilitate that process.
         Task.Run(delegate ()
         {
             _ = DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.High, () =>
@@ -473,6 +546,56 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
         ManipulatableContainer container = new ManipulatableContainer();
         container.Content = element;
         hostGrid.Children.Add(container);
+    }
+
+    /// <summary>
+    /// A BitmapImage can be sourced from these image file formats:
+    /// - Joint Photographic Experts Group (JPEG)
+    /// - Portable Network Graphics (PNG)
+    /// - Bitmap (BMP)
+    /// - Graphics Interchange Format (GIF)
+    /// - Tagged Image File Format (TIFF)
+    /// - JPEG XR
+    /// - Icon (ICO)
+    /// </summary>
+    /// <remarks>
+    /// If the image source is a stream, that stream is expected to contain an image file in one of these formats.
+    /// The BitmapImage class represents an abstraction so that an image source can be set asynchronously but still 
+    /// be referenced in XAML markup as a property value, or in code as an object that doesn't use awaitable syntax. 
+    /// When you create a BitmapImage object in code, it initially has no valid source. You should then set its source 
+    /// using one of these techniques:
+    /// Use the BitmapImage(Uri) constructor rather than the default constructor. Although it's a constructor you can 
+    /// think of this as having an implicit asynchronous behavior: the BitmapImage won't be ready for use until it 
+    /// raises an ImageOpened event that indicates a successful async source set operation.
+    /// Set the UriSource property. As with using the Uri constructor, this action is implicitly asynchronous, and the 
+    /// BitmapImage won't be ready for use until it raises an ImageOpened event.
+    /// Use SetSourceAsync. This method is explicitly asynchronous. The properties where you might use a BitmapImage, 
+    /// such as Image.Source, are designed for this asynchronous behavior, and won't throw exceptions if they are set 
+    /// using a BitmapImage that doesn't have a complete source yet. Rather than handling exceptions, you should handle 
+    /// ImageOpened or ImageFailed events either on the BitmapImage directly or on the control that uses the source 
+    /// (if those events are available on the control class).
+    /// ImageFailed and ImageOpened are mutually exclusive. One event or the other will always be raised whenever a 
+    /// BitmapImage object has its source value set or reset.
+    /// The API for Image, BitmapImage and BitmapSource doesn't include any dedicated methods for encoding and decoding 
+    /// of media formats. All of the encode and decode operations are built-in, and at most will surface aspects of 
+    /// encode or decode as part of event data for load events. 
+    /// If you want to do any special work with image encode or decode, which you might use if your app is doing image 
+    /// conversions or manipulation, you should use the API that are available in the Windows.Graphics.Imaging namespace.
+    /// </remarks>
+    void TestImage_Loaded(object sender, RoutedEventArgs e)
+    {
+        Image? img = sender as Image;
+        if (img is null)
+            return;
+
+        Microsoft.UI.Xaml.Media.Imaging.BitmapImage bitmapImage = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
+        // TODO: Try -1 for DecodePixelWidth
+        img.Width = bitmapImage.DecodePixelWidth = 80;
+        // Natural px width of image source. You don't need to set DecodePixelHeight because
+        // the system maintains aspect ratio, and calculates the other dimension, as long as
+        // one dimension measurement is provided.
+        bitmapImage.UriSource = new Uri(img.BaseUri, "Assets/StoreLogo.png");
+        img.Source = bitmapImage;
     }
 
     void IconsOnTemplatePointerPressed(object sender, PointerRoutedEventArgs e)
@@ -526,11 +649,51 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// <see cref="TextBox"/> event.
+    /// </summary>
     void TextBox_GotFocus(object sender, RoutedEventArgs e)
     {
         var tb = sender as TextBox;
         tb?.SelectAll();
     }
+
+    #region [Win32 API]
+    /// <summary>
+    /// SystemParametersInfo reads or sets information about numerous settings in Windows.
+    /// These include Windows's accessibility features as well as various settings for other things.
+    /// The exact behavior of the function depends on the flag passed as uAction.
+    /// All sizes and dimensions used by this function are measured in pixels.
+    /// http://www.jasinskionline.com/windowsapi/ref/s/systemparametersinfo.html
+    /// </summary>
+    /// <param name="uiAction">The exact behavior of the function depends on the SPI flag passed as uAction.</param>
+    /// <param name="uiParam">The purpose of this parameter varies with uAction. </param>
+    /// <param name="pvParam">The purpose of this parameter varies with uAction. In VB, if this is to be set as a string or to 0, the ByVal keyword must preceed it.</param>
+    /// <param name="fWinIni">Zero or more of the following flags specifying the change notification to take place. Generally, this can be set to 0 if the function merely queries information, but should be set to something if the function sets information.
+    ///   SPIF_SENDWININICHANGE = &H2 (broadcast the change made by the function to all running programs)
+    ///   SPIF_UPDATEINIFILE    = &H1 (save the change made by the function to the user profile)
+    /// </param>
+    /// <returns></returns>
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    [return: MarshalAs(UnmanagedType.I4)]
+    //static extern Int32 SystemParametersInfo(UInt32 uiAction, UInt32 uiParam, ref UInt32 pvParam, UInt32 fWinIni);
+    static extern Int32 SystemParametersInfo(UInt32 uiAction, UInt32 uiParam, String pvParam, UInt32 fWinIni);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    [return: MarshalAs(UnmanagedType.I4)]
+    static extern Int32 SystemParametersInfo(UInt32 uiAction, UInt32 uiParam, ref UInt32 pvParam, UInt32 fWinIni);
+
+    // Set the current desktop wallpaper bitmap. uiParam must be 0. pvParam is a String holding the filename of the bitmap file to use as the wallpaper. 
+    static UInt32 SPI_SETDESKWALLPAPER = 20;
+    // Determine if the warning beeper is on or off. uiParam must be 0. pvParam is a Long-type variable which receives 0 if the warning beeper is off, or a non-zero value if it is on. 
+    static UInt32 SPI_GETBEEP = 1;
+    // Determine if fast Alt-Tab task switching is enabled. uiParam must be 0. pvParam is a Long-type variable which receives 0 if fast task switching is not enabled, or a non-zero value if it is. 
+    static UInt32 SPI_GETFASTTASKSWITCH = 35;
+    // Determine whether font smoothing is enabled or not. uiParam must be 0. pvParam is a Long-type variable which receives 0 if font smoothing is not enabled, or a non-zero value if it is. 
+    static UInt32 SPI_GETFONTSMOOTHING = 74;
+    static UInt32 SPIF_UPDATEINIFILE = 0x1;
+    static UInt32 SPIF_SENDWININICHANGE = 0x2;
+    #endregion
 }
 
 public static class Functions

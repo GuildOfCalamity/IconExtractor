@@ -14,11 +14,13 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices.WindowsRuntime;
+using System.Threading;
 using System.Threading.Tasks;
 using Windows.ApplicationModel;
 using Windows.ApplicationModel.Activation;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
+using Windows.UI.Popups;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -30,8 +32,11 @@ namespace IconExtractor
     /// </summary>
     public partial class App : Application
     {
+        static DateTime m_lastChange = DateTime.Now;
         public static int m_width { get; set; } = 940;
         public static int m_height { get; set; } = 700;
+        public static int m_posX { get; set; } = 10;
+        public static int m_posY { get; set; } = 10;
 
         private Window? m_window;
         public static IntPtr WindowHandle { get; set; }
@@ -114,6 +119,55 @@ namespace IconExtractor
                 appWin.Destroying += (s, e) =>
                 {
                     Debug.WriteLine($"[INFO] Application destroying detected at {DateTime.Now.ToString("hh:mm:ss.fff tt")}");
+                };
+
+                // The changed event holds a bunch of juicy info that we can extrapolate.
+                appWin.Changed += (s, args) =>
+                {
+                    // Add debounce in scenarios where this event could be hammered (e.g. updating a config file).
+                    var idleTime = DateTime.Now - m_lastChange;
+                    if (idleTime.TotalSeconds > 1.01d)
+                    {
+                        m_lastChange = DateTime.Now;
+                        
+                        // Check window size.
+                        if (args.DidSizeChange)
+                        {
+                            if (s.Size.Height > 0 && s.Size.Width > 0)
+                            {
+                                Debug.WriteLine($"[INFO] Window size changed: {s.Size.Width},{s.Size.Height}");
+                                m_height = s.Size.Height;
+                                m_width = s.Size.Width;
+                            }
+                        }
+
+                        // Check window position.
+                        if (args.DidPositionChange)
+                        {
+                            if (s.Position.X > 0 && s.Position.Y > 0)
+                            {
+                                // This property is initially null. Once a window has been shown it always has a
+                                // presenter applied, either one applied by the platform or applied by the app itself.
+                                if (s.Presenter is not null && s.Presenter is OverlappedPresenter op)
+                                {
+                                    if (op.State == OverlappedPresenterState.Minimized)
+                                    {
+                                        Debug.WriteLine($"[INFO] Ignoring position saving (window minimized)");
+                                    }
+                                    else if (op.State != OverlappedPresenterState.Maximized)
+                                    {
+                                        Debug.WriteLine($"[INFO] Window position changed: {s.Position.X},{s.Position.Y}");
+                                        m_posX = s.Position.X;
+                                        m_posY = s.Position.Y;
+                                    }
+                                    else
+                                    {
+                                        Debug.WriteLine($"[INFO] Ignoring position saving (window maximized)");
+                                    }
+                                }
+                            }
+                        }
+                    }
                 };
 
                 // Set the application icon.
@@ -329,6 +383,209 @@ namespace IconExtractor
         /// Returns the AssemblyVersion, not the FileVersion.
         /// </summary>
         public static Version GetCurrentAssemblyVersion() => System.Reflection.Assembly.GetExecutingAssembly().GetName().Version ?? new Version();
+        #endregion
+
+        #region [Dialog Helpers]
+        static SemaphoreSlim semaSlim = new SemaphoreSlim(1, 1);
+        /// <summary>
+        /// The <see cref="Windows.UI.Popups.MessageDialog"/> does not look as nice as the
+        /// <see cref="Microsoft.UI.Xaml.Controls.ContentDialog"/> and is not part of the native Microsoft.UI.Xaml.Controls.
+        /// The <see cref="Windows.UI.Popups.MessageDialog"/> offers the <see cref="Windows.UI.Popups.UICommandInvokedHandler"/> 
+        /// callback, but this could be replaced with actions. Both can be shown asynchronously.
+        /// </summary>
+        /// <remarks>
+        /// You'll need to call <see cref="WinRT.Interop.InitializeWithWindow.Initialize"/> when using the <see cref="Windows.UI.Popups.MessageDialog"/>,
+        /// because the <see cref="Microsoft.UI.Xaml.XamlRoot"/> does not exist and an owner must be defined.
+        /// </remarks>
+        public static async Task ShowMessageBox(string title, string message, string yesText, string noText, Action? yesAction, Action? noAction)
+        {
+            if (App.WindowHandle == IntPtr.Zero) { return; }
+
+            // Create the dialog.
+            var messageDialog = new MessageDialog($"{message}");
+            messageDialog.Title = title;
+
+            if (!string.IsNullOrEmpty(yesText))
+            {
+                messageDialog.Commands.Add(new UICommand($"{yesText}", (opt) => { yesAction?.Invoke(); }));
+                messageDialog.DefaultCommandIndex = 0;
+            }
+
+            if (!string.IsNullOrEmpty(noText))
+            {
+                messageDialog.Commands.Add(new UICommand($"{noText}", (opt) => { noAction?.Invoke(); }));
+                messageDialog.DefaultCommandIndex = 1;
+            }
+
+            // We must initialize the dialog with an owner.
+            WinRT.Interop.InitializeWithWindow.Initialize(messageDialog, App.WindowHandle);
+            // Show the message dialog. Our DialogDismissedHandler will deal with what selection the user wants.
+            await messageDialog.ShowAsync();
+            // We could force the result in a separate timer...
+            //DialogDismissedHandler(new UICommand("time-out"));
+        }
+
+        /// <summary>
+        /// The <see cref="Windows.UI.Popups.MessageDialog"/> does not look as nice as the
+        /// <see cref="Microsoft.UI.Xaml.Controls.ContentDialog"/> and is not part of the native Microsoft.UI.Xaml.Controls.
+        /// The <see cref="Windows.UI.Popups.MessageDialog"/> offers the <see cref="Windows.UI.Popups.UICommandInvokedHandler"/> 
+        /// callback, but this could be replaced with actions. Both can be shown asynchronously.
+        /// </summary>
+        /// <remarks>
+        /// You'll need to call <see cref="WinRT.Interop.InitializeWithWindow.Initialize"/> when using the <see cref="Windows.UI.Popups.MessageDialog"/>,
+        /// because the <see cref="Microsoft.UI.Xaml.XamlRoot"/> does not exist and an owner must be defined.
+        /// </remarks>
+        public static async Task ShowMessageBox(string title, string message, string primaryText, string cancelText)
+        {
+            // Create the dialog.
+            var messageDialog = new MessageDialog($"{message}");
+            messageDialog.Title = title;
+
+            if (!string.IsNullOrEmpty(primaryText))
+            {
+                messageDialog.Commands.Add(new UICommand($"{primaryText}", new UICommandInvokedHandler(DialogDismissedHandler)));
+                messageDialog.DefaultCommandIndex = 0;
+            }
+
+            if (!string.IsNullOrEmpty(cancelText))
+            {
+                messageDialog.Commands.Add(new UICommand($"{cancelText}", new UICommandInvokedHandler(DialogDismissedHandler)));
+                messageDialog.DefaultCommandIndex = 1;
+            }
+            // We must initialize the dialog with an owner.
+            WinRT.Interop.InitializeWithWindow.Initialize(messageDialog, App.WindowHandle);
+            // Show the message dialog. Our DialogDismissedHandler will deal with what selection the user wants.
+            await messageDialog.ShowAsync();
+
+            // We could force the result in a separate timer...
+            //DialogDismissedHandler(new UICommand("time-out"));
+        }
+
+        /// <summary>
+        /// Callback for the selected option from the user.
+        /// </summary>
+        static void DialogDismissedHandler(IUICommand command)
+        {
+            Debug.WriteLine($"[INFO] UICommand.Label ⇨ {command.Label}");
+        }
+
+        /// <summary>
+        /// The <see cref="Microsoft.UI.Xaml.Controls.ContentDialog"/> looks much better than the
+        /// <see cref="Windows.UI.Popups.MessageDialog"/> and is part of the native Microsoft.UI.Xaml.Controls.
+        /// The <see cref="Microsoft.UI.Xaml.Controls.ContentDialog"/> does not offer a <see cref="Windows.UI.Popups.UICommandInvokedHandler"/>
+        /// callback, but in this example was replaced with actions. Both can be shown asynchronously.
+        /// </summary>
+        /// <remarks>
+        /// There is no need to call <see cref="WinRT.Interop.InitializeWithWindow.Initialize"/> when using the <see cref="Microsoft.UI.Xaml.Controls.ContentDialog"/>,
+        /// but a <see cref="Microsoft.UI.Xaml.XamlRoot"/> must be defined since it inherits from <see cref="Microsoft.UI.Xaml.Controls.Control"/>.
+        /// The <see cref="SemaphoreSlim"/> was added to prevent "COMException: Only one ContentDialog can be opened at a time."
+        /// </remarks>
+        public static async Task ShowDialogBox(string title, string message, string primaryText, string cancelText, Action? onPrimary, Action? onCancel, Uri? imageUri)
+        {
+            if (App.MainRoot?.XamlRoot == null) { return; }
+
+            await semaSlim.WaitAsync();
+
+            #region [Initialize Assets]
+            double fontSize = 16;
+            Microsoft.UI.Xaml.Media.FontFamily fontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas");
+
+            if (App.Current.Resources.TryGetValue("FontSizeMedium", out object _))
+                fontSize = (double)App.Current.Resources["FontSizeMedium"];
+
+            if (App.Current.Resources.TryGetValue("PrimaryFont", out object _))
+                fontFamily = (Microsoft.UI.Xaml.Media.FontFamily)App.Current.Resources["PrimaryFont"];
+
+            StackPanel panel = new StackPanel()
+            {
+                Orientation = Microsoft.UI.Xaml.Controls.Orientation.Vertical,
+                Spacing = 10d
+            };
+
+            if (imageUri is not null)
+            {
+                panel.Children.Add(new Image
+                {
+                    Margin = new Thickness(1, -50, 1, 1), // Move the image into the title area.
+                    HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Right,
+                    Stretch = Microsoft.UI.Xaml.Media.Stretch.UniformToFill,
+                    Width = 40,
+                    Height = 40,
+                    Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(imageUri)
+                });
+            }
+
+            panel.Children.Add(new TextBlock()
+            {
+                Text = message,
+                FontSize = fontSize,
+                FontFamily = fontFamily,
+                HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Left,
+                TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap
+            });
+
+            var tb = new TextBox()
+            {
+                Text = message,
+                FontSize = fontSize,
+                FontFamily = fontFamily,
+                TextWrapping = TextWrapping.Wrap
+            };
+            tb.Loaded += (s, e) => { tb.SelectAll(); };
+            #endregion
+
+            // NOTE: Content dialogs will automatically darken the background.
+            ContentDialog contentDialog = new ContentDialog()
+            {
+                Title = title,
+                PrimaryButtonText = primaryText,
+                CloseButtonText = cancelText,
+                Content = panel,
+                XamlRoot = App.MainRoot?.XamlRoot,
+                RequestedTheme = App.MainRoot?.ActualTheme ?? ElementTheme.Default
+            };
+
+            try
+            {
+                ContentDialogResult result = await contentDialog.ShowAsync();
+
+                switch (result)
+                {
+                    case ContentDialogResult.Primary:
+                        onPrimary?.Invoke();
+                        break;
+                    //case ContentDialogResult.Secondary:
+                    //    onSecondary?.Invoke();
+                    //    break;
+                    case ContentDialogResult.None: // Cancel
+                        onCancel?.Invoke();
+                        break;
+                    default:
+                        Debug.WriteLine($"Dialog result not defined.");
+                        break;
+                }
+            }
+            catch (System.Runtime.InteropServices.COMException ex)
+            {
+                Debug.WriteLine($"[ERROR] ShowDialogBox: {ex.Message}");
+            }
+            finally
+            {
+                semaSlim.Release();
+            }
+        }
+
+        public static void CloseAllDialogs()
+        {
+            if (App.MainRoot?.XamlRoot == null) { return; }
+
+            var openedDialogs = VisualTreeHelper.GetOpenPopupsForXamlRoot(App.MainRoot?.XamlRoot);
+            foreach (var item in openedDialogs)
+            {
+                if (item.Child is ContentDialog dialog)
+                    dialog.Hide();
+            }
+        }
         #endregion
     }
 }
