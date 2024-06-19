@@ -16,6 +16,7 @@ using System.Reflection;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Shapes;
 using Windows.ApplicationModel;
 using Windows.ApplicationModel.Activation;
 using Windows.Foundation;
@@ -32,16 +33,23 @@ namespace IconExtractor
     /// </summary>
     public partial class App : Application
     {
+        private Window? m_window;
         static DateTime m_lastChange = DateTime.Now;
         public static int m_width { get; set; } = 940;
         public static int m_height { get; set; } = 700;
         public static int m_posX { get; set; } = 10;
         public static int m_posY { get; set; } = 10;
-
-        private Window? m_window;
         public static IntPtr WindowHandle { get; set; }
         public static FrameworkElement? MainRoot { get; set; }
         public static bool IsClosing { get; set; } = false;
+        public static string DesktopPath { get; } = Windows.Storage.UserDataPaths.GetDefault().Desktop;
+        public static string DownloadsPath { get; } = Windows.Storage.UserDataPaths.GetDefault().Downloads;
+        public static string DocumentsPath { get; } = Windows.Storage.UserDataPaths.GetDefault().Documents;
+        public static string PicturesPath { get; } = Windows.Storage.UserDataPaths.GetDefault().Pictures;
+        public static string ProfilePath { get; } = Windows.Storage.UserDataPaths.GetDefault().Profile;
+        public static string LocalAppDataPath { get; } = Windows.Storage.UserDataPaths.GetDefault().LocalAppData;
+        public static string InternetCachePath { get; } = Windows.Storage.UserDataPaths.GetDefault().InternetCache;
+
 
         // https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/#advantages-and-disadvantages-of-packaging-your-app
 #if IS_UNPACKAGED // We're using a custom PropertyGroup Condition we defined in the csproj to help us with the decision.
@@ -78,6 +86,8 @@ namespace IconExtractor
                 this.DebugSettings.BindingFailed += DebugOnBindingFailed;
                 this.DebugSettings.XamlResourceReferenceFailed += DebugOnXamlResourceReferenceFailed;
             }
+
+            //_ = BeginConsoleListener();
         }
 
         /// <summary>
@@ -587,5 +597,40 @@ namespace IconExtractor
             }
         }
         #endregion
+
+        /// <summary>
+        /// Console testing.
+        /// </summary>
+        static async Task BeginConsoleListener()
+        {
+            try
+            {
+                await Task.Run(async () =>
+                {
+                    while (true)
+                    {
+                        var line = await Console.In.ReadLineAsync();
+                        if (!string.IsNullOrEmpty(line))
+                        {
+                            DebugLog($"Got console line: \"{line}\"");
+                            var args = line.Split(' ');
+                            if (args.Length > 0)
+                            {
+                                if (args[0].Equals("close", StringComparison.OrdinalIgnoreCase) || 
+                                    args[0].Equals("exit", StringComparison.OrdinalIgnoreCase) ||
+                                    args[0].Equals("quit", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    Application.Current.Exit();
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            catch (Exception ex) 
+            {
+                DebugLog($"BeginConsoleListener ⇒ {ex.Message}");
+            }
+        }
     }
 }

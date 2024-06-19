@@ -43,40 +43,256 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
 
     public List<string> dlls = new List<string>
     {
-        "imageres.dll",
-        "shell32.dll",
-        "ddores.dll",
-        "wmploc.dll",
-        "pifmgr.dll",
+        "aclui.dll",
         "accessibilitycpl.dll",
+        "ActionCenter.dll",
+        "ActionCenterCPL.dll",
+        "AdmTmpl.dll",
+        "appmgr.dll",
+        "audiosrv.dll",
+        "AuditNativeSnapIn.dll",
+        "AuthFWGP.dll",
+        "autoplay.dll",
+        "basecsp.dll",
+        "azroleui.dll",
+        "bootux.dll",
+        "bthci.dll",
+        "btpanui.dll",
+        "BthpanContextHandler.dll",
+        "cabview.dll",
+        "CastingShellExt.dll",
+        "CertEnrollUI.dll",
+        "cewmdm.dll",
+        "certmgr.dll",
+        "cmdial32.dll",
+        "cmlua.dll",
+        "cmstplua.dll",
+        "colorui.dll",
+        "comres.dll",
+        "console.dll",
+        "ContentDeliveryManager.Utilities.dll",
+        "cryptuiwizard.dll",
+        "DAMM.dll",
+        "deskadp.dll",
+        "deskmon.dll",
+        "DeviceCenter.dll",
+        "DevicePairingFolder.dll",
+        "dfshim.dll",
+        "devmgr.dll",
+        "diagperf.dll",
+        "DiagCpl.dll",
+        "Display.dll",
+        "dmdskres.dll",
+        "dot3gpui.dll",
+        "dot3mm.dll",
+        "dskquoui.dll",
+        "dsprop.dll",
+        "dsquery.dll",
+        "DXP.dll",
+        "DxpTaskSync.dll",
+        "eapsimextdesktop.dll",
+        "EditionUpgradeManagerObj.dll",
+        "EhStorShell.dll",
+        "EhStorPwdMgr.dll",
+        "els.dll",
+        "ExplorerFrame.dll",
+        "fde.dll",
+        "fdprint.dll",
+        "fhcpl.dll",
+        "filemgmt.dll",
+        "FirewallControlPanel.dll",
+        "fontext.dll",
+        "fveui.dll",
+        "fvewiz.dll",
+        "fvecpl.dll",
+        "FXSCOMPOSERES.dll",
+        "gcdef.dll",
+        "gpprefcl.dll",
+        "gpedit.dll",
+        "hgcpl.dll",
+        "hnetcfg.dll",
+        "hotplug.dll",
+        "icm32.dll",
+        "icsigd.dll",
+        "iernonce.dll",
+        "ieframe.dll",
+        "imagesp1.dll",
+        "imageres.dll",
+        "input.dll",
+        "INETRES.dll",
+        "ipsecsnp.dll",
+        "ipsmsnap.dll",
+        "itss.dll",
+        "iscsicpl.dll",
+        "keymgr.dll",
+        "localsec.dll",
+        "mapi32.dll",
+        "mapistub.dll",
+        "mciavi32.dll",
+        "mferror.dll",
+        "miguiresource.dll",
+        "mmcshext.dll",
+        "mmcbase.dll",
         "moricons.dll",
-        "mmcndmgr.dll",
-        "mmres.dll",
+        "mqsnap.dll",
+        "mqutil.dll",
+        "msacm32.dll",
+        "msctf.dll",
+        "mscandui.dll",
+        "msctfui.dll",
+        "msi.dll",
+        "msident.dll",
+        "msidntld.dll",
+        "msihnd.dll",
+        "msieftp.dll",
+        "msports.dll",
+        "mssvp.dll",
+        "mstsc.exe",
+        "msutb.dll",
+        "mstask.dll",
+        "msxml3.dll",
+        "mycomput.dll",
+        "mydocs.dll",
+        "ncpa.cpl",
+        "ndfapi.dll",
+        "netplwiz.dll",
         "netcenter.dll",
         "netshell.dll",
         "networkexplorer.dll",
-        "pnidui.dll",
-        "sensorscpl.dll",
+        "newdev.dll",
+        "ntlanui2.dll",
+        "ntshrui.dll",
+        "nvcuda.dll",
+        "ole32.dll",
+        "objsel.dll",
+        "occache.dll",
+        "oleprn.dll",
+        "packager.dll",
+        "pifmgr.dll",
+        "photowiz.dll",
+        "pmcsnap.dll",
+        "pnpclean.dll",
+        "PortableDeviceStatus.dll",
+        "ppcsnap.dll",
+        "powercpl.dll",
+        "printui.dll",
+        "prnntfy.dll",
+        "prnfldr.dll",
+        "quartz.dll",
+        "RADCUI.dll",
+        "rasgcw.dll",
+        "RASMM.dll",
+        "rasdlg.dll",
+        "rdbui.dll",
+        "rastlsext.dll",
+        "rastls.dll",
+        "remotepg.dll",
+        "sberes.dll",
+        "scavengeui.dll",
+        "SCardDlg.dll",
+        "scksp.dll",
+        "scrobj.dll",
+        "sdhcinst.dll",
+        "scrptadm.dll",
+        "SearchFolder.dll",
+        "sdcpl.dll",
+        "SecurityHealthAgent.dll",
+        "SecurityHealthSSO.dll",
         "setupapi.dll",
-        "wpdshext.dll",
-        "compstui.dll",
-        "ieframe.dll",
-        "dmdskres.dll",
-        "dsuiext.dll",
-        "mstscax.dll",
-        "wiashext.dll",
-        "comres.dll",
-        "actioncentercpl.dll",
-        "aclui.dll",
-        "autoplay.dll",
-        "comctl32.dll",
-        "filemgmt.dll",
-        "ncpa.cpl",
+        "SensorsCpl.dll",
+        "shlwapi.dll",
+        "shell32.dll",
+        "setupcln.dll",
+        "shwebsvc.dll",
+        "softkbd.dll",
+        "SndVolSSO.dll",
+        "SpaceControl.dll",
+        "sppcommdlg.dll",
+        "sppcomapi.dll",
+        "srm.dll",
+        "srchadmin.dll",
+        "srrstr.dll",
+        "SrpUxNativeSnapIn.dll",
+        "sti.dll",
+        "stobject.dll",
+        "sud.dll",
+        "sysclass.dll",
+        "SysFxUI.dll",
+        "Tabbtn.dll",
+        "tcpipcfg.dll",
+        "taskbarcpl.dll",
+        "tapiui.dll",
+        "themecpl.dll",
+        "tpmcompc.dll",
+        "TSWorkspace.dll",
+        "twext.dll",
+        "UIRibbonRes.dll",
+        "urlmon.dll",
+        "user32.dll",
         "url.dll",
-        "xwizards.dll",
-        "imagesp1.dll",
-        "mstsc.exe",
-        "explorer.exe"
+        "usbui.dll",
+        "UserAccountControlSettings.dll",
+        "usercpl.dll",
+        "VAN.dll",
+        "Vault.dll",
+        "vfwwdm32.dll",
+        "wdc.dll",
+        "webcheck.dll",
+        "werui.dll",
+        "werconcpl.dll",
+        "wiaaut.dll",
+        "WFSR.dll",
+        "wiadefui.dll",
+        "wiashext.dll",
+        "Windows.Storage.Search.dll",
+        "Windows.UI.CredDialogController.dll",
+        "winmm.dll",
+        "wininetlui.dll",
+        "winsrv.dll",
+        "wlanpref.dll",
+        "wlangpui.dll",
+        "WMPhoto.dll",
+        "WorkfoldersControl.dll",
+        "wmploc.DLL",
+        "WorkFoldersRes.dll",
+        "wsecedit.dll",
+        "zipfldr.dll",
+        #region [Original Reference List]
+        //"imageres.dll",
+        //"shell32.dll",
+        //"ddores.dll",
+        //"wmploc.dll",
+        //"pifmgr.dll",
+        //"accessibilitycpl.dll",
+        //"moricons.dll",
+        //"mmcndmgr.dll",
+        //"mmres.dll",
+        //"netcenter.dll",
+        //"netshell.dll",
+        //"networkexplorer.dll",
+        //"pnidui.dll",
+        //"sensorscpl.dll",
+        //"setupapi.dll",
+        //"wpdshext.dll",
+        //"compstui.dll",
+        //"ieframe.dll",
+        //"dmdskres.dll",
+        //"dsuiext.dll",
+        //"mstscax.dll",
+        //"wiashext.dll",
+        //"comres.dll",
+        //"actioncentercpl.dll",
+        //"aclui.dll",
+        //"autoplay.dll",
+        //"comctl32.dll",
+        //"filemgmt.dll",
+        //"ncpa.cpl",
+        //"url.dll",
+        //"xwizards.dll",
+        //"imagesp1.dll",
+        //"mstsc.exe",
+        //"explorer.exe",
+        #endregion
     };
 
     private string _target = "imageres.dll";
@@ -269,8 +485,8 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
             NotifyPropertyChanged(nameof(SearchIconFileInfo));
         }
     }
-    public string imageresPath { get; private set; }= System.IO.Path.Combine(Constants.UserEnvironmentPaths.SystemRootPath, "System32", "imageres.dll");
-    public string shell32Path { get; private set; }= System.IO.Path.Combine(Constants.UserEnvironmentPaths.SystemRootPath, "System32", "shell32.dll");
+    public string imageresPath { get; private set; } = System.IO.Path.Combine(Constants.UserEnvironmentPaths.SystemRootPath, "System32", "imageres.dll");
+    public string shell32Path { get; private set; } = System.IO.Path.Combine(Constants.UserEnvironmentPaths.SystemRootPath, "System32", "shell32.dll");
 
     protected void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
     {
@@ -394,10 +610,76 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
             });
         });
 
-
         // Desktop wallpaper refresh.
         TestCommand = new RelayCommand<object>((obj) => 
         {
+            // This was the initial scan that I performed to determine which DLLs contained icon assets.
+            #region [Testing each DLL in System32]
+            //var searchDir = System.IO.Path.Combine(Constants.UserEnvironmentPaths.SystemRootPath, "System32");
+            //if (Directory.Exists(searchDir))
+            //{
+            //    DirectoryInfo? searchDI = new DirectoryInfo(searchDir);
+            //    FileInfo[]? files = searchDI?.GetFiles("*.dll", SearchOption.TopDirectoryOnly);
+            //    if (files != null)
+            //    {
+            //        StoryboardPath.Resume();
+            //        IsBusy = true;
+            //
+            //        FileInfo? best = files.OrderByDescending(f => f.LastWriteTime).FirstOrDefault();
+            //        foreach (var file in files)
+            //        {
+            //            var name = file.FullName;
+            //            if (name.Contains("_"))
+            //                continue;
+            //
+            //            var request = Enumerable.Range(1, 500).ToList();
+            //            Status = $"🔔 Analyzing: {name} ({file.LastWriteTime})";
+            //            IList<IconFileInfo>? fullImageResList = null;
+            //            var extraction = Task.Run(() =>
+            //            {
+            //                fullImageResList = Extensions.ExtractSelectedIconsFromDLL(name, request, 64);
+            //            }).GetAwaiter();
+            //            extraction.OnCompleted(() =>
+            //            {
+            //                if (fullImageResList != null)
+            //                {
+            //                    try
+            //                    {
+            //                        if (fullImageResList.Any())
+            //                        {
+            //                            foreach (var img in fullImageResList)
+            //                            {
+            //                                if (img is not null)
+            //                                {
+            //                                    App.DebugLog($"Contains icons ⇒ {Path.GetFileName(name)}");
+            //                                    break;
+            //                                }
+            //                            }
+            //                        }
+            //                        else
+            //                        {
+            //                            Status = $"⚠️ {name} contained no usable icons";
+            //                        }
+            //                    }
+            //                    catch (Exception ex)
+            //                    {
+            //                        Debug.WriteLine($"[ERROR] {ex.Message}");
+            //                        Status = $"[ERROR] {ex.Message}";
+            //                    }
+            //                }
+            //                else
+            //                {
+            //                    Status = $"⚠️ No results to show";
+            //                }
+            //            });
+            //        }
+            //
+            //        IsBusy = false;
+            //        StoryboardPath.Pause();
+            //    }
+            //}
+            #endregion
+
             var imgPath = Path.Combine(AppContext.BaseDirectory, $"{App.GetCurrentNamespace()}Screenshot.png");
             if (File.Exists(imgPath))
             {
@@ -409,7 +691,7 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
                     "Cancel",
                     () => { _ = SystemParametersInfo(SPI_SETDESKWALLPAPER, 0, imgPath, SPIF_UPDATEINIFILE); Status = "🔔 Wallpaper change accepted by user"; },
                     () => { Status = "🔔 Wallpaper change canceled by user"; },
-                    new Uri($"ms-appx:///Assets/Question.png"));
+                    new Uri($"ms-appx:///Assets/Warning.png"));
             }
             uint result = 99;
             _ = SystemParametersInfo(SPI_GETFASTTASKSWITCH, 0, ref result, SPIF_UPDATEINIFILE);
@@ -664,19 +946,18 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
     /// These include Windows's accessibility features as well as various settings for other things.
     /// The exact behavior of the function depends on the flag passed as uAction.
     /// All sizes and dimensions used by this function are measured in pixels.
-    /// http://www.jasinskionline.com/windowsapi/ref/s/systemparametersinfo.html
+    /// https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-systemparametersinfoa
     /// </summary>
     /// <param name="uiAction">The exact behavior of the function depends on the SPI flag passed as uAction.</param>
     /// <param name="uiParam">The purpose of this parameter varies with uAction. </param>
     /// <param name="pvParam">The purpose of this parameter varies with uAction. In VB, if this is to be set as a string or to 0, the ByVal keyword must preceed it.</param>
     /// <param name="fWinIni">Zero or more of the following flags specifying the change notification to take place. Generally, this can be set to 0 if the function merely queries information, but should be set to something if the function sets information.
-    ///   SPIF_SENDWININICHANGE = &H2 (broadcast the change made by the function to all running programs)
-    ///   SPIF_UPDATEINIFILE    = &H1 (save the change made by the function to the user profile)
+    ///   SPIF_SENDWININICHANGE = 0x02 (broadcast the change made by the function to all running programs)
+    ///   SPIF_UPDATEINIFILE    = 0x01 (save the change made by the function to the user profile)
     /// </param>
     /// <returns></returns>
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     [return: MarshalAs(UnmanagedType.I4)]
-    //static extern Int32 SystemParametersInfo(UInt32 uiAction, UInt32 uiParam, ref UInt32 pvParam, UInt32 fWinIni);
     static extern Int32 SystemParametersInfo(UInt32 uiAction, UInt32 uiParam, String pvParam, UInt32 fWinIni);
 
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
