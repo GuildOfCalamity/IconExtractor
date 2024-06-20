@@ -329,6 +329,15 @@
             </Ellipse.Fill>
         </Ellipse>-->
 
+        <!--  AutoCloseInfoBar  -->
+        <ctrls:AutoCloseInfoBar
+            x:Name="infoBar"
+            Grid.Row="2"
+            Margin="6"
+            VerticalAlignment="Bottom"
+            AutoCloseInterval="6000"
+            IsOpen="False"
+            Severity="Informational" />
 
         <ScrollViewer
             Grid.Row="2"

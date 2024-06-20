@@ -691,7 +691,7 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
                     "Cancel",
                     () => { _ = SystemParametersInfo(SPI_SETDESKWALLPAPER, 0, imgPath, SPIF_UPDATEINIFILE); Status = "🔔 Wallpaper change accepted by user"; },
                     () => { Status = "🔔 Wallpaper change canceled by user"; },
-                    new Uri($"ms-appx:///Assets/Warning.png"));
+                    new Uri($"ms-appx:///Assets/Notice.png"));
             }
             uint result = 99;
             _ = SystemParametersInfo(SPI_GETFASTTASKSWITCH, 0, ref result, SPIF_UPDATEINIFILE);
@@ -795,6 +795,7 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
         Status = "✔️ Ready";
         StoryboardPath.Begin();
         StoryboardPath.Pause();
+        ShowMessage("ItemsGridView Loaded", InfoBarSeverity.Informational);
 
         #region [Manipulatable Container Test]
         //Image img = new Image 
@@ -938,6 +939,21 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
     {
         var tb = sender as TextBox;
         tb?.SelectAll();
+    }
+
+    /// <summary>
+    /// Thread-safe helper for <see cref="Microsoft.UI.Xaml.Controls.InfoBar"/>.
+    /// </summary>
+    /// <param name="message">text to show</param>
+    /// <param name="severity"><see cref="Microsoft.UI.Xaml.Controls.InfoBarSeverity"/></param>
+    public void ShowMessage(string message, InfoBarSeverity severity = InfoBarSeverity.Informational)
+    {
+        infoBar.DispatcherQueue?.TryEnqueue(() =>
+        {
+            infoBar.IsOpen = true;
+            infoBar.Severity = severity;
+            infoBar.Message = $"{message}";
+        });
     }
 
     #region [Win32 API]
