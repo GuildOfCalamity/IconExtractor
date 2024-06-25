@@ -329,16 +329,6 @@
             </Ellipse.Fill>
         </Ellipse>-->
 
-        <!--  AutoCloseInfoBar  -->
-        <ctrls:AutoCloseInfoBar
-            x:Name="infoBar"
-            Grid.Row="2"
-            Margin="6"
-            VerticalAlignment="Bottom"
-            AutoCloseInterval="6000"
-            IsOpen="False"
-            Severity="Informational" />
-
         <ScrollViewer
             Grid.Row="2"
             HorizontalAlignment="Stretch"
@@ -355,6 +345,71 @@
                 </ItemsRepeater.Layout>
             </ItemsRepeater>
         </ScrollViewer>
+
+
+        <!--  AutoCloseInfoBar  -->
+        <ctrls:AutoCloseInfoBar
+            x:Name="infoBar"
+            Grid.Row="2"
+            Margin="6"
+            VerticalAlignment="Bottom"
+            AutoCloseInterval="7000"
+            IsOpen="False"
+            Severity="Informational">
+            <ctrls:AutoCloseInfoBar.ActionButton>
+                <DropDownButton HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <TextBlock
+                        FontFamily="Segoe MDL2 Assets"
+                        FontSize="14"
+                        Text="&#xE700;" />
+                    <DropDownButton.Flyout>
+                        <MenuFlyout x:Name="flyout" Placement="TopEdgeAlignedLeft">
+                            <MenuFlyoutItem
+                                Command="{x:Bind AboutCommand}"
+                                CommandParameter="{Binding RelativeSource={RelativeSource Mode=Self}, Mode=OneWay}"
+                                Text="Show assemblies">
+                                <MenuFlyoutItem.Icon>
+                                    <FontIcon Glyph="&#xE7EE;" />
+                                </MenuFlyoutItem.Icon>
+                            </MenuFlyoutItem>
+                        </MenuFlyout>
+                    </DropDownButton.Flyout>
+                </DropDownButton>
+            </ctrls:AutoCloseInfoBar.ActionButton>
+        </ctrls:AutoCloseInfoBar>
+
+        <!--  Referenced Assemblies Dialog  -->
+        <ContentDialog
+            x:Name="contentDialog"
+            Width="470"
+            CloseButtonText="OK">
+            <!--  Title Style  -->
+            <ContentDialog.TitleTemplate>
+                <DataTemplate>
+                    <StackPanel Orientation="Horizontal">
+                        <Image
+                            Height="50"
+                            Shadow="{ThemeResource CommandBarFlyoutOverflowShadow}"
+                            Source="/Assets/Info.png" />
+                        <TextBlock
+                            Margin="9,0"
+                            VerticalAlignment="Center"
+                            Shadow="{ThemeResource CommandBarFlyoutOverflowShadow}"
+                            Text="Referenced Assemblies" />
+                    </StackPanel>
+                </DataTemplate>
+            </ContentDialog.TitleTemplate>
+            <!--  Button Style  -->
+            <ContentDialog.CloseButtonStyle>
+                <Style TargetType="Button">
+                    <!-- <Setter Property="Background" Value="{ThemeResource SecondaryBrush}" /> -->
+                    <Setter Property="CornerRadius" Value="4" />
+                </Style>
+            </ContentDialog.CloseButtonStyle>
+            <ScrollViewer MaxHeight="300">
+                <TextBlock x:Name="tbAssemblies" TextWrapping="WrapWholeWords" />
+            </ScrollViewer>
+        </ContentDialog>
 
     </Grid>
 

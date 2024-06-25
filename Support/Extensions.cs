@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -271,6 +272,175 @@ public static class Extensions
             }
         }
         return text;
+    }
+
+    /// <summary>
+    /// Fetch all <see cref="ProcessModule"/>s in the current running process.
+    /// </summary>
+    /// <param name="excludeWinSys">if true any file path starting with %windir% will be excluded from the results</param>
+    public static string GatherLoadedModules(bool excludeWinSys)
+    {
+        var modules = new StringBuilder();
+        // Setup some common library paths if exclude option is desired.
+        var winSys = Environment.GetFolderPath(Environment.SpecialFolder.Windows) ?? "N/A";
+        var winProg = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles) ?? "N/A";
+        try
+        {
+            var process = Process.GetCurrentProcess();
+            foreach (ProcessModule module in process.Modules)
+            {
+                var fn = module.FileName ?? "Empty";
+                if (excludeWinSys && !fn.StartsWith(winSys, StringComparison.OrdinalIgnoreCase) && !fn.StartsWith(winProg, StringComparison.OrdinalIgnoreCase))
+                    modules.AppendLine($"{System.IO.Path.GetFileName(fn)} (v{GetFileVersion(fn)})");
+                else if (!excludeWinSys)
+                    modules.AppendLine($"{System.IO.Path.GetFileName(fn)} (v{GetFileVersion(fn)})");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ERROR] GatherLoadedModules: {ex.Message}");
+        }
+        return modules.ToString();
+    }
+
+    /// <summary>
+    /// Brute force alpha removal of <see cref="Version"/> text
+    /// is not always the best approach, e.g. the following:
+    /// "3.0.0-zmain.2211 (DCPP(199ff10ec000000)(cloudtest).160101.0800)"
+    /// ...converts to:
+    /// "3.0.0.221119910000000.160101.0800"
+    /// ...which is not accurate.
+    /// </summary>
+    /// <param name="fullPath">the entire path to the file</param>
+    /// <returns>sanitized <see cref="Version"/></returns>
+    public static Version GetFileVersion(string fullPath)
+    {
+        try
+        {
+            var ver = FileVersionInfo.GetVersionInfo(fullPath).FileVersion;
+            if (string.IsNullOrEmpty(ver)) { return new Version(); }
+            if (ver.HasSpace())
+            {   // Some assemblies contain versions such as "10.0.22622.1030 (WinBuild.160101.0800)"
+                // This will cause the Version constructor to throw an exception, so just take the first piece.
+                var chunk = ver.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                var firstPiece = Regex.Replace(chunk[0].Replace(',', '.'), "[^.0-9]", "");
+                return new Version(firstPiece);
+            }
+            string cleanVersion = Regex.Replace(ver, "[^.0-9]", "");
+            return new Version(cleanVersion);
+        }
+        catch (Exception)
+        {
+            return new Version(); // 0.0
+        }
+    }
+
+    public static bool HasAlpha(this string str)
+    {
+        if (string.IsNullOrEmpty(str)) { return false; }
+        return str.Any(x => char.IsLetter(x));
+    }
+    public static bool HasAlphaRegex(this string str)
+    {
+        return Regex.IsMatch(str ?? "", @"[+a-zA-Z]+");
+    }
+
+    public static bool HasNumeric(this string str)
+    {
+        if (string.IsNullOrEmpty(str)) { return false; }
+        return str.Any(x => char.IsNumber(x));
+    }
+    public static bool HasNumericRegex(this string str)
+    {
+        return Regex.IsMatch(str ?? "", @"[0-9]+"); // [^\D+]
+    }
+
+    public static bool HasSpace(this string str)
+    {
+        if (string.IsNullOrEmpty(str)) { return false; }
+        return str.Any(x => char.IsSeparator(x));
+    }
+    public static bool HasSpaceRegex(this string str)
+    {
+        return Regex.IsMatch(str ?? "", @"[\s]+");
+    }
+
+    public static bool HasPunctuation(this string str)
+    {
+        if (string.IsNullOrEmpty(str)) { return false; }
+        return str.Any(x => char.IsPunctuation(x));
+    }
+
+    public static bool HasAlphaNumeric(this string str)
+    {
+        if (string.IsNullOrEmpty(str)) { return false; }
+        return str.Any(x => char.IsNumber(x)) && str.Any(x => char.IsLetter(x));
+    }
+    public static bool HasAlphaNumericRegex(this string str)
+    {
+        return Regex.IsMatch(str ?? "", "[a-zA-Z0-9]+");
+    }
+
+    public static string RemoveAlphas(this string str)
+    {
+        return string.Concat(str?.Where(c => char.IsNumber(c) || c == '.') ?? string.Empty);
+    }
+
+    public static string RemoveNumerics(this string str)
+    {
+        return string.Concat(str?.Where(c => char.IsLetter(c)) ?? string.Empty);
+    }
+
+    public static string RemoveExtraSpaces(this string strText)
+    {
+        if (!string.IsNullOrEmpty(strText))
+            strText = Regex.Replace(strText, @"\s+", " ");
+
+        return strText;
+    }
+
+    /// <summary>
+    /// String normalize helper.
+    /// </summary>
+    /// <param name="strThis"></param>
+    /// <returns>sanitized string</returns>
+    public static string? RemoveDiacritics(this string strThis)
+    {
+        if (strThis == null)
+            return null;
+
+        var sb = new StringBuilder();
+
+        foreach (char c in strThis.Normalize(NormalizationForm.FormD))
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+                sb.Append(c);
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// ExampleTextSample => Example Text Sample
+    /// </summary>
+    /// <param name="input"></param>
+    /// <returns>space delimited string</returns>
+    public static string SeparateCamelCase(this string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return input;
+
+        StringBuilder result = new StringBuilder();
+        result.Append(input[0]);
+
+        for (int i = 1; i < input.Length; i++)
+        {
+            if (char.IsUpper(input[i]))
+                result.Append(' ');
+
+            result.Append(input[i]);
+        }
+
+        return result.ToString();
     }
 
     public static string NameOf(this object obj) => $"{obj.GetType().Name} => {obj.GetType().BaseType?.Name}";

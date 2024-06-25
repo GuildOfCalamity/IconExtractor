@@ -405,6 +405,152 @@ internal static class BitmapHelper
         return softwareBitmap;
     }
 
+    public static async Task<Microsoft.UI.Xaml.Media.Imaging.WriteableBitmap?> OpenWriteableBitmap(Windows.Storage.StorageFile storageFile)
+    {
+        try
+        {
+            using (Windows.Storage.Streams.IRandomAccessStream stream = await storageFile.OpenAsync(Windows.Storage.FileAccessMode.Read))
+            {
+                Windows.Graphics.Imaging.BitmapDecoder decoder = await Windows.Graphics.Imaging.BitmapDecoder.CreateAsync(stream);
+                Microsoft.UI.Xaml.Media.Imaging.WriteableBitmap image = new Microsoft.UI.Xaml.Media.Imaging.WriteableBitmap((int)decoder.PixelWidth, (int)decoder.PixelHeight);
+                image.SetSource(stream);
+                return image;
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ERROR] OpenWriteableBitmap: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Decodes a <see cref="byte[]"/> to <see cref="Microsoft.UI.Xaml.Media.Imaging.BitmapImage"/>
+    /// via <see cref="Windows.Graphics.Imaging.BitmapDecoder.CreateAsync"/>.
+    /// </summary>
+    /// <param name="data"><see cref="byte[]"/></param>
+    /// <returns><see cref="Microsoft.UI.Xaml.Media.Imaging.BitmapImage"/> if successful, null otherwise</returns>
+    public static async Task<ImageSource?> ImageFromBase64(byte[] bytes, Guid? decoderId)
+    {
+        try
+        {
+            if (decoderId == null)
+            {
+                decoderId = Windows.Graphics.Imaging.BitmapDecoder.PngDecoderId; // https://learn.microsoft.com/en-us/uwp/api/windows.graphics.imaging.bitmapdecoder.pngdecoderid?view=winrt-22621
+                // [Available decoders]
+                //  - GIF
+                //  - HEIF
+                //  - ICO
+                //  - JPEG
+                //  - JPEGXR
+                //  - PNG
+                //  - TIFF
+                //  - WEBP
+            }
+
+            Windows.Storage.Streams.IRandomAccessStream? image = bytes.AsBuffer().AsStream().AsRandomAccessStream();
+
+            // Create the decoder from the image bytes.
+            var decoder = await Windows.Graphics.Imaging.BitmapDecoder.CreateAsync((Guid)decoderId, image);
+            image.Seek(0);
+
+            // Create writable bitmap from decoder source.
+            var output = new Microsoft.UI.Xaml.Media.Imaging.WriteableBitmap((int)decoder.PixelHeight, (int)decoder.PixelWidth);
+            await output.SetSourceAsync(image);
+
+            return output;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ERROR] ImageFromBase64: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Convert <see cref="byte[]"/> to <see cref="Microsoft.UI.Xaml.Media.Imaging.BitmapImage"/>
+    /// via <see cref="Windows.Storage.Streams.DataWriter"/>.
+    /// </summary>
+    /// <param name="data"><see cref="byte[]"/></param>
+    /// <returns><see cref="Microsoft.UI.Xaml.Media.Imaging.BitmapImage"/> if successful, null otherwise</returns>
+    public static async Task<Microsoft.UI.Xaml.Media.Imaging.BitmapImage?> GetBitmapAsync(byte[] data)
+    {
+        try
+        {
+            var bitmapImage = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
+            using (var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream())
+            {
+                using (var writer = new Windows.Storage.Streams.DataWriter(stream))
+                {
+                    writer.WriteBytes(data);
+                    await writer.StoreAsync();
+                    await writer.FlushAsync();
+                    writer.DetachStream(); // probably called after leaving using scope
+                }
+                stream.Seek(0);
+                await bitmapImage.SetSourceAsync(stream);
+            }
+            return bitmapImage;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ERROR] GetBitmapAsync: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Saves/Encodes a <see cref="Microsoft.UI.Xaml.Media.Imaging.WriteableBitmap"/> to a <see cref="Windows.Storage.IStorageFile"/>
+    /// via <see cref="Windows.Graphics.Imaging.BitmapEncoder.CreateAsync"/>.
+    /// </summary>
+    /// <returns>true if successful, false otherwise</returns>
+    public static async Task<bool> SaveToFile(Microsoft.UI.Xaml.Media.Imaging.WriteableBitmap writeableBitmap, Windows.Storage.IStorageFile outputFile, Guid? encoderId)
+    {
+        try
+        {
+            if (encoderId == null)
+            {
+                encoderId = Windows.Graphics.Imaging.BitmapDecoder.PngDecoderId; // https://learn.microsoft.com/en-us/uwp/api/windows.graphics.imaging.bitmapdecoder.pngdecoderid?view=winrt-22621
+                // [Available encoders]
+                //  - GIF
+                //  - HEIF
+                //  - ICO
+                //  - JPEG
+                //  - JPEGXR
+                //  - PNG
+                //  - TIFF
+                //  - WEBP
+            }
+
+            Stream stream = writeableBitmap.PixelBuffer.AsStream();
+            byte[] pixels = new byte[(uint)stream.Length];
+            await stream.ReadAsync(pixels, 0, pixels.Length);
+
+            using (var writeStream = await outputFile.OpenAsync(FileAccessMode.ReadWrite))
+            {
+                var encoder = await Windows.Graphics.Imaging.BitmapEncoder.CreateAsync((Guid)encoderId, writeStream);
+                
+                encoder.SetPixelData(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied,
+                    (uint)writeableBitmap.PixelWidth, (uint)writeableBitmap.PixelHeight,
+                    dpiX: 96, dpiY: 96,
+                    pixels);
+                
+                await encoder.FlushAsync();
+
+                using (var outputStream = writeStream.GetOutputStreamAt(0))
+                {
+                    await outputStream.FlushAsync();
+                }
+            }
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ERROR] GetBitmapAsync: {ex.Message}");
+            return false;
+        }
+    }
+
     /// <summary>
     /// The "other" BitmapImage, but we don't talk about him at the dinner table.
     /// </summary>
@@ -452,6 +598,29 @@ internal static class BitmapHelper
             Windows.Graphics.Imaging.BitmapDecoder decoder = await Windows.Graphics.Imaging.BitmapDecoder.CreateAsync(stream);
             return await decoder.GetSoftwareBitmapAsync();
         }
+    }
+
+    /// <summary>
+    /// Returns an encoder <see cref="Guid"/> based on the <paramref name="fileName"/> extension.
+    /// </summary>
+    public static Guid GetEncoderId(string fileName)
+    {
+        var ext = Path.GetExtension(fileName);
+
+        if (new[] { ".bmp", ".dib" }.Contains(ext))
+            return Windows.Graphics.Imaging.BitmapEncoder.BmpEncoderId;
+        else if (new[] { ".tiff", ".tif" }.Contains(ext))
+            return Windows.Graphics.Imaging.BitmapEncoder.TiffEncoderId;
+        else if (new[] { ".gif" }.Contains(ext))
+            return Windows.Graphics.Imaging.BitmapEncoder.GifEncoderId;
+        else if (new[] { ".jpg", ".jpeg", ".jpe", ".jfif", ".jif" }.Contains(ext))
+            return Windows.Graphics.Imaging.BitmapEncoder.JpegEncoderId;
+        else if (new[] { ".hdp", ".jxr", ".wdp" }.Contains(ext))
+            return Windows.Graphics.Imaging.BitmapEncoder.JpegXREncoderId;
+        else if (new[] { ".heic", ".heif", ".heifs" }.Contains(ext))
+            return Windows.Graphics.Imaging.BitmapEncoder.HeifEncoderId;
+        else // default will be PNG
+            return Windows.Graphics.Imaging.BitmapEncoder.PngEncoderId;
     }
 
     #region [Internal Methods]

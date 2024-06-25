@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading.Tasks;
@@ -12,22 +13,22 @@ using System.Windows.Input;
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Controls.Primitives;
-using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Xaml.Navigation;
-
-using Windows.Foundation;
-using Windows.Foundation.Collections;
 using Windows.Storage.Streams;
 using Windows.Graphics.Imaging;
-using Windows.Storage;
 
 using IconExtractor.Models;
 using IconExtractor.Support;
 using IconExtractor.Controls;
-using System.Runtime.InteropServices;
+
+using TargetFrameworkAttribute = System.Runtime.Versioning.TargetFrameworkAttribute;
+using InformationalAttribute = System.Reflection.AssemblyInformationalVersionAttribute;
+using ConfigurationAttribute = System.Reflection.AssemblyConfigurationAttribute;
+using FileVersionAttribute = System.Reflection.AssemblyFileVersionAttribute;
+using ProductAttribute = System.Reflection.AssemblyProductAttribute;
+using CompanyAttribute = System.Reflection.AssemblyCompanyAttribute;
+
 
 namespace IconExtractor;
 
@@ -510,6 +511,7 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
 
     public ICommand TraverseCommand { get; }
     public ICommand TestCommand { get; }
+    public ICommand AboutCommand { get; }
 
     public MainPage()
     {
@@ -547,10 +549,12 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
                     {
                         if (fullImageResList.Any())
                         {
+                            int count = 0;
                             foreach (var img in fullImageResList)
                             {
                                 if (!App.IsClosing && img is not null)
                                 {
+                                    count++;
                                     imgCycle?.DispatcherQueue.TryEnqueue(async () =>
                                     {
                                         var bmp = await img.IconData.ToBitmapAsync();
@@ -575,6 +579,7 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
                                     });
                                 }
                             }
+                            ShowMessage($"Process complete ⇒ {count} total icons", InfoBarSeverity.Informational);
                         }
                         else
                         {
@@ -697,6 +702,20 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
             _ = SystemParametersInfo(SPI_GETFASTTASKSWITCH, 0, ref result, SPIF_UPDATEINIFILE);
             Status = $"{(result == 0 ? "Alt-Tab task switching is disabled" : "Alt-Tab task switching is enabled")}";
         });
+
+        // Dump assemblies.
+        AboutCommand = new RelayCommand<object>(async (obj) =>
+        {
+            try
+            {
+                var data = Extensions.GatherLoadedModules(true);
+                if (string.IsNullOrEmpty(data)) { return; }
+                tbAssemblies.Text = data;
+                contentDialog.XamlRoot = App.MainRoot?.XamlRoot;
+                await contentDialog.ShowAsync();
+            }
+            catch (Exception ex) { Status = $"{ex.Message}"; }
+        });
     }
 
     /// <summary>
@@ -795,7 +814,8 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
         Status = "✔️ Ready";
         StoryboardPath.Begin();
         StoryboardPath.Pause();
-        ShowMessage("ItemsGridView Loaded", InfoBarSeverity.Informational);
+
+        ShowMessage(ReflectAssemblyFramework(typeof(MainPage)), InfoBarSeverity.Informational);
 
         #region [Manipulatable Container Test]
         //Image img = new Image 
@@ -948,12 +968,38 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
     /// <param name="severity"><see cref="Microsoft.UI.Xaml.Controls.InfoBarSeverity"/></param>
     public void ShowMessage(string message, InfoBarSeverity severity = InfoBarSeverity.Informational)
     {
+        if (App.IsClosing)
+            return;
+
         infoBar.DispatcherQueue?.TryEnqueue(() =>
         {
             infoBar.IsOpen = true;
             infoBar.Severity = severity;
             infoBar.Message = $"{message}";
         });
+    }
+
+    /// <summary>
+    /// Reflective AssemblyInfo attributes
+    /// </summary>
+    public string ReflectAssemblyFramework(Type type)
+    {
+        try
+        {
+            System.Reflection.Assembly assembly = type.Assembly;
+            if (assembly != null)
+            {
+                var fileVerAttr = (FileVersionAttribute)assembly.GetCustomAttributes(typeof(FileVersionAttribute), false)[0];
+                var confAttr = (ConfigurationAttribute)assembly.GetCustomAttributes(typeof(ConfigurationAttribute), false)[0];
+                var frameAttr = (TargetFrameworkAttribute)assembly.GetCustomAttributes(typeof(TargetFrameworkAttribute), false)[0];
+                var compAttr = (CompanyAttribute)assembly.GetCustomAttributes(typeof(CompanyAttribute), false)[0];
+                var nameAttr = (ProductAttribute)assembly.GetCustomAttributes(typeof(ProductAttribute), false)[0];
+                var verAttr = (InformationalAttribute)assembly.GetCustomAttributes(typeof(InformationalAttribute), false)[0];
+                return string.Format("{0} {1} {2} {3} – User '{4}' on {5}", nameAttr.Product, verAttr.InformationalVersion, string.IsNullOrEmpty(confAttr.Configuration) ? "–" : confAttr.Configuration, string.IsNullOrEmpty(frameAttr.FrameworkDisplayName) ? frameAttr.FrameworkName : frameAttr.FrameworkDisplayName, Environment.UserName, Environment.OSVersion);
+            }
+        }
+        catch (Exception) { }
+        return string.Empty;
     }
 
     #region [Win32 API]
