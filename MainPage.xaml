@@ -147,6 +147,15 @@
                 Foreground="{ThemeResource GradientTitleBrush}"
                 Text="{x:Bind Status, Mode=OneWay}" />
 
+            <Button
+                HorizontalAlignment="Center"
+                VerticalAlignment="Bottom"
+                Command="{x:Bind DebugCommand}"
+                CommandParameter="{Binding RelativeSource={RelativeSource Mode=Self}, Mode=OneWay}"
+                Content="⏱️"
+                FontSize="24"
+                Style="{StaticResource ToolbarButton}" />
+
         </StackPanel>
 
         <StackPanel

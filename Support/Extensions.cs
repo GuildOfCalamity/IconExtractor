@@ -5,14 +5,24 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 
-using IconExtractor.Models;
+using Microsoft.UI;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+
+using Windows.Foundation;
+using Windows.Graphics.Imaging;
+using Windows.Storage.Streams;
+using Windows.Storage;
 
 using Vanara.PInvoke;
-
+using IconExtractor.Models;
 
 namespace IconExtractor;
 
@@ -447,5 +457,457 @@ public static class Extensions
     public static int MapValue(this int val, int inMin, int inMax, int outMin, int outMax) => (val - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
     public static float MapValue(this float val, float inMin, float inMax, float outMin, float outMax) => (val - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
     public static double MapValue(this double val, double inMin, double inMax, double outMin, double outMax) => (val - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
+
+    /// <summary>
+    /// Multiplies the given <see cref="TimeSpan"/> by the scalar amount provided.
+    /// </summary>
+    public static TimeSpan Multiply(this TimeSpan timeSpan, double scalar) => new TimeSpan((long)(timeSpan.Ticks * scalar));
+
+    /// <summary>
+    /// Returns the AppData path including the <paramref name="moduleName"/>.
+    /// e.g. "C:\Users\UserName\AppData\Local\MenuDemo\Settings"
+    /// </summary>
+    public static string LocalApplicationDataFolder(string moduleName = "Settings")
+    {
+        var result = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}\\{moduleName}");
+        return result;
+    }
+
+    /// <summary>
+    /// Use this if you only have a root resource dictionary.
+    /// var rdBrush = Extensions.GetResource<SolidColorBrush>("PrimaryBrush");
+    /// </summary>
+    public static T? GetResource<T>(string resourceName) where T : class
+    {
+        try
+        {
+            if (Application.Current.Resources.TryGetValue($"{resourceName}", out object value))
+                return (T)value;
+            else
+                return default(T);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Use this if you have merged theme resource dictionaries.
+    /// var darkBrush = Extensions.GetThemeResource<SolidColorBrush>("PrimaryBrush", ElementTheme.Dark);
+    /// var lightBrush = Extensions.GetThemeResource<SolidColorBrush>("PrimaryBrush", ElementTheme.Light);
+    /// </summary>
+    public static T? GetThemeResource<T>(string resourceName, ElementTheme? theme) where T : class
+    {
+        try
+        {
+            if (theme == null) { theme = ElementTheme.Default; }
+            var dictionaries = Application.Current.Resources.MergedDictionaries;
+            foreach (var item in dictionaries)
+            {
+                // Do we have any themes in this resource dictionary?
+                if (item.ThemeDictionaries.Count > 0)
+                {
+                    if (theme == ElementTheme.Dark)
+                    {
+                        if (item.ThemeDictionaries.TryGetValue("Dark", out var drd))
+                        {
+                            ResourceDictionary? dark = drd as ResourceDictionary;
+                            if (dark != null)
+                            {
+                                Debug.WriteLine($"[INFO] Found dark theme resource dictionary.");
+                                if (dark.TryGetValue($"{resourceName}", out var tmp))
+                                    return (T)tmp;
+                            }
+                        }
+                        else { Debug.WriteLine($"[WARNING] {nameof(ElementTheme.Dark)} theme was not found."); }
+                    }
+                    else if (theme == ElementTheme.Light)
+                    {
+                        if (item.ThemeDictionaries.TryGetValue("Light", out var lrd))
+                        {
+                            ResourceDictionary? light = lrd as ResourceDictionary;
+                            if (light != null)
+                            {
+                                Debug.WriteLine($"[INFO] Found light theme resource dictionary.");
+                                if (light.TryGetValue($"{resourceName}", out var tmp))
+                                    return (T)tmp;
+                            }
+                        }
+                        else { Debug.WriteLine($"[WARNING] {nameof(ElementTheme.Light)} theme was not found."); }
+                    }
+                    else if (theme == ElementTheme.Default)
+                    {
+                        if (item.ThemeDictionaries.TryGetValue("Default", out var drd))
+                        {
+                            ResourceDictionary? dflt = drd as ResourceDictionary;
+                            if (dflt != null)
+                            {
+                                Debug.WriteLine($"[INFO] Found default theme resource dictionary.");
+                                if (dflt.TryGetValue($"{resourceName}", out var tmp))
+                                    return (T)tmp;
+                            }
+                        }
+                        else { Debug.WriteLine($"[WARNING] {nameof(ElementTheme.Default)} theme was not found."); }
+                    }
+                    else
+                    {
+                        Debug.WriteLine($"[WARNING] No theme to match.");
+                    }
+                }
+                else
+                {
+                    Debug.WriteLine($"[WARNING] No theme dictionaries found.");
+                }
+            }
+            return default(T);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    public static IconElement? GetIcon(string imagePath)
+    {
+        IconElement? result = null;
+
+        try
+        {
+            result = imagePath.ToLowerInvariant().EndsWith(".png") ?
+                        (IconElement)new BitmapIcon() { UriSource = new Uri(imagePath, UriKind.RelativeOrAbsolute), ShowAsMonochrome = false } :
+                        (IconElement)new FontIcon() { Glyph = imagePath };
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ERROR] GetIcon: {ex.Message}");
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// int cvrt = (int)FluentIcon.MapPin;
+    /// string icon = IntToUTF16(cvrt);
+    /// https://stackoverflow.com/questions/71546789/the-u-escape-sequence-in-c-sharp
+    /// </summary>
+    public static string IntToUTF16(int value)
+    {
+        var builder = new StringBuilder();
+        builder.Append((char)value);
+        return builder.ToString();
+    }
+
+    public static async Task<SoftwareBitmap> LoadFromFile(StorageFile file)
+    {
+        SoftwareBitmap softwareBitmap;
+        using (IRandomAccessStream stream = await file.OpenAsync(FileAccessMode.Read))
+        {
+            BitmapDecoder decoder = await BitmapDecoder.CreateAsync(stream);
+            softwareBitmap = await decoder.GetSoftwareBitmapAsync(BitmapPixelFormat.Rgba8, BitmapAlphaMode.Premultiplied);
+        }
+        return softwareBitmap;
+    }
+
+    public static async Task<string> LoadText(string relativeFilePath)
+    {
+#if IS_UNPACKAGED
+        var sourcePath = System.IO.Path.GetFullPath(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Assembly.GetEntryAssembly().Location ?? System.IO.Directory.GetCurrentDirectory()), relativeFilePath));
+        var file = await StorageFile.GetFileFromPathAsync(sourcePath);
+#else
+        Uri sourceUri = new Uri("ms-appx:///" + relativeFilePath);
+        var file = await StorageFile.GetFileFromApplicationUriAsync(sourceUri);
+#endif
+        return await FileIO.ReadTextAsync(file);
+    }
+
+    public static async Task<IList<string>> LoadLines(string relativeFilePath)
+    {
+        string fileContents = await LoadText(relativeFilePath);
+        return fileContents.Split(Environment.NewLine).ToList();
+    }
+
+    /// <summary>
+    /// Creates a Windows Runtime asynchronous operation that returns the last element of the observable sequence.
+    /// Upon cancellation of the asynchronous operation, the subscription to the source sequence will be disposed.
+    /// </summary>
+    /// <typeparam name="TSource">The type of the elements in the source sequence.</typeparam>
+    /// <param name="source">Source sequence to expose as an asynchronous operation.</param>
+    /// <returns>Windows Runtime asynchronous operation object that returns the last element of the observable sequence.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> is null.</exception>
+    public static IAsyncOperation<TSource> ToAsyncOperation<TSource>(this IObservable<TSource> source)
+    {
+        if (source == null)
+            throw new ArgumentNullException(nameof(source));
+
+        return AsyncInfo.Run(ct => source.ToTask(ct));
+    }
+
+    /// <summary>
+    /// Returns a task that will receive the last value or the exception produced by the observable sequence.
+    /// </summary>
+    /// <typeparam name="TResult">The type of the elements in the source sequence.</typeparam>
+    /// <param name="observable">Observable sequence to convert to a task.</param>
+    /// <returns>A task that will receive the last element or the exception produced by the observable sequence.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="observable"/> is <c>null</c>.</exception>
+    public static Task<TResult> ToTask<TResult>(this IObservable<TResult> observable)
+    {
+        if (observable == null)
+            throw new ArgumentNullException(nameof(observable));
+
+        return observable.ToTask(new CancellationToken());
+    }
+
+    /// <summary>
+    /// Returns a task that will receive the last value or the exception produced by the observable sequence.
+    /// </summary>
+    /// <typeparam name="TResult">The type of the elements in the source sequence.</typeparam>
+    /// <param name="observable">Observable sequence to convert to a task.</param>
+    /// <param name="state">The state to use as the underlying task's AsyncState.</param>
+    /// <returns>A task that will receive the last element or the exception produced by the observable sequence.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="observable"/> is <c>null</c>.</exception>
+    public static Task<TResult> ToTask<TResult>(this IObservable<TResult> observable, object? state)
+    {
+        if (observable == null)
+        {
+            throw new ArgumentNullException(nameof(observable));
+        }
+
+        return observable.ToTask(new CancellationToken());
+    }
+
+    /// <summary>
+    /// Returns a task that will receive the last value or the exception produced by the observable sequence.
+    /// </summary>
+    /// <typeparam name="TResult">The type of the elements in the source sequence.</typeparam>
+    /// <param name="observable">Observable sequence to convert to a task.</param>
+    /// <param name="cancellationToken">Cancellation token that can be used to cancel the task, causing unsubscription from the observable sequence.</param>
+    /// <returns>A task that will receive the last element or the exception produced by the observable sequence.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="observable"/> is <c>null</c>.</exception>
+    public static Task<TResult> ToTask<TResult>(this IObservable<TResult> observable, CancellationToken cancellationToken)
+    {
+        if (observable == null)
+        {
+            throw new ArgumentNullException(nameof(observable));
+        }
+
+        return observable.ToTask(cancellationToken);
+    }
+
+    /// <summary>
+    /// ToTask Helper Extension
+    /// ((Func<double, double, double>)Math.Pow).ToTask(2d, 2d).ContinueWith(x => ((Action<string, object[]>) Console.WriteLine).ToTask("Power value: {0}", new object[] { x.Result })).Wait();
+    /// </summary>
+    public static Task<TResult> ToTask<TResult>(this Func<TResult> function, AsyncCallback? callback = default(AsyncCallback), object? @object = default(object), TaskCreationOptions creationOptions = default(TaskCreationOptions), TaskScheduler? scheduler = default(TaskScheduler))
+    {
+        return Task<TResult>.Factory.FromAsync(function.BeginInvoke(callback, @object), function.EndInvoke, creationOptions, (scheduler ?? TaskScheduler.Current) ?? TaskScheduler.Default);
+    }
+    public static Task<TResult> ToTask<T, TResult>(this Func<T, TResult> function, T arg, AsyncCallback? callback = default(AsyncCallback), object @object = default(object), TaskCreationOptions creationOptions = default(TaskCreationOptions), TaskScheduler? scheduler = default(TaskScheduler))
+    {
+        return Task<TResult>.Factory.FromAsync(function.BeginInvoke(arg, callback, @object), function.EndInvoke, creationOptions, (scheduler ?? TaskScheduler.Current) ?? TaskScheduler.Default);
+    }
+
+    /// <summary>
+    /// Task extension to add a timeout.
+    /// </summary>
+    /// <returns>The task with timeout.</returns>
+    /// <param name="task">Task.</param>
+    /// <param name="timeoutInMilliseconds">Timeout duration in Milliseconds.</param>
+    /// <typeparam name="T">The 1st type parameter.</typeparam>
+    public async static Task<T> WithTimeout<T>(this Task<T> task, int timeoutInMilliseconds)
+    {
+        var retTask = await Task.WhenAny(task, Task.Delay(timeoutInMilliseconds))
+            .ConfigureAwait(false);
+
+#pragma warning disable CS8603 // Possible null reference return.
+        return retTask is Task<T> ? task.Result : default;
+#pragma warning restore CS8603 // Possible null reference return.
+    }
+
+    /// <summary>
+    /// Task extension to add a timeout.
+    /// </summary>
+    /// <returns>The task with timeout.</returns>
+    /// <param name="task">Task.</param>
+    /// <param name="timeout">Timeout Duration.</param>
+    /// <typeparam name="T">The 1st type parameter.</typeparam>
+    public static Task<T> WithTimeout<T>(this Task<T> task, TimeSpan timeout) => WithTimeout(task, (int)timeout.TotalMilliseconds);
+
+#pragma warning disable RECS0165 // Asynchronous methods should return a Task instead of void
+    /// <summary>
+    /// Attempts to await on the task and catches exception
+    /// </summary>
+    /// <param name="task">Task to execute</param>
+    /// <param name="onException">What to do when method has an exception</param>
+    /// <param name="continueOnCapturedContext">If the context should be captured.</param>
+    public static async void SafeFireAndForget(this Task task, Action<Exception>? onException = null, bool continueOnCapturedContext = false)
+#pragma warning restore RECS0165 // Asynchronous methods should return a Task instead of void
+    {
+        try
+        {
+            await task.ConfigureAwait(continueOnCapturedContext);
+        }
+        catch (Exception ex) when (onException != null)
+        {
+            onException.Invoke(ex);
+        }
+    }
+
+    /// <summary>
+    /// Chainable task helper.
+    /// var result = await SomeLongAsyncFunction().WithCancellation(cts.Token);
+    /// </summary>
+    /// <typeparam name="TResult">the type of task result</typeparam>
+    /// <returns><see cref="Task"/>TResult</returns>
+    public static Task<TResult> WithCancellation<TResult>(this Task<TResult> task, CancellationToken cancelToken)
+    {
+        TaskCompletionSource<TResult> tcs = new TaskCompletionSource<TResult>();
+        CancellationTokenRegistration reg = cancelToken.Register(() => tcs.TrySetCanceled());
+        task.ContinueWith(ant =>
+        {
+            reg.Dispose(); // NOTE: it's important to dispose of CancellationTokenRegistrations or they will hand around in memory until the application closes
+            if (ant.IsCanceled)
+                tcs.TrySetCanceled();
+            else if (ant.IsFaulted)
+                tcs.TrySetException(ant.Exception.InnerException);
+            else
+                tcs.TrySetResult(ant.Result);
+        });
+        return tcs.Task;  // Return the TaskCompletionSource result
+    }
+
+    public static Task<T> WithAllExceptions<T>(this Task<T> task)
+    {
+        TaskCompletionSource<T> tcs = new TaskCompletionSource<T>();
+
+        task.ContinueWith(ignored =>
+        {
+            switch (task.Status)
+            {
+                case TaskStatus.Canceled:
+                    Debug.WriteLine($"[TaskStatus.Canceled]");
+                    tcs.SetCanceled();
+                    break;
+                case TaskStatus.RanToCompletion:
+                    tcs.SetResult(task.Result);
+                    Debug.WriteLine($"[TaskStatus.RanToCompletion]: {task.Result}");
+                    break;
+                case TaskStatus.Faulted:
+                    // SetException will automatically wrap the original AggregateException in another
+                    // one. The new wrapper will be removed in TaskAwaiter, leaving the original intact.
+                    Debug.WriteLine($"[TaskStatus.Faulted]: {task.Exception?.Message}");
+                    tcs.SetException(task.Exception ?? new Exception("Exception object was null"));
+                    break;
+                default:
+                    Debug.WriteLine($"[TaskStatus.Invalid]: Continuation called illegally.");
+                    tcs.SetException(new InvalidOperationException("Continuation called illegally."));
+                    break;
+            }
+        });
+        return tcs.Task;
+    }
+
+    /// <summary>
+    /// Task.Factory.StartNew (() => { throw null; }).IgnoreExceptions();
+    /// </summary>
+    public static void IgnoreExceptions(this Task task, bool logEx = false)
+    {
+        task.ContinueWith(t =>
+        {
+            AggregateException ignore = t.Exception;
+
+            ignore?.Flatten().Handle(ex =>
+            {
+                if (logEx)
+                    Debug.WriteLine("Exception type: {0}\r\nException Message: {1}", ex.GetType(), ex.Message);
+                return true; // don't re-throw
+            });
+
+        }, TaskContinuationOptions.OnlyOnFaulted);
+    }
+
+    public static Task ContinueWithState<TState>(this Task task, Action<Task, TState> continuationAction, TState state, CancellationToken cancellationToken, TaskContinuationOptions continuationOptions)
+    {
+        return task.ContinueWith(
+            (t, tupleObject) =>
+            {
+                var (closureAction, closureState) = ((Action<Task, TState>, TState))tupleObject!;
+
+                closureAction(t, closureState);
+            },
+            (continuationAction, state),
+            cancellationToken,
+            continuationOptions,
+            TaskScheduler.Default);
+    }
+
+    public static Task ContinueWithState<TResult, TState>(this Task<TResult> task, Action<Task<TResult>, TState> continuationAction, TState state, CancellationToken cancellationToken)
+    {
+        return task.ContinueWith(
+            (t, tupleObject) =>
+            {
+                var (closureAction, closureState) = ((Action<Task<TResult>, TState>, TState))tupleObject!;
+
+                closureAction(t, closureState);
+            },
+            (continuationAction, state),
+            cancellationToken);
+    }
+
+    public static Task ContinueWithState<TResult, TState>(this Task<TResult> task, Action<Task<TResult>, TState> continuationAction, TState state, CancellationToken cancellationToken, TaskContinuationOptions continuationOptions)
+    {
+        return task.ContinueWith(
+            (t, tupleObject) =>
+            {
+                var (closureAction, closureState) = ((Action<Task<TResult>, TState>, TState))tupleObject!;
+
+                closureAction(t, closureState);
+            },
+            (continuationAction, state),
+            cancellationToken,
+            continuationOptions,
+            TaskScheduler.Default);
+    }
+
+    public static bool ImplementsInterface(this Type baseType, Type interfaceType) => baseType.GetInterfaces().Any(interfaceType.Equals);
+
+    public static void PostWithComplete<T>(this SynchronizationContext context, Action<T> action, T state)
+    {
+        context.OperationStarted();
+        context.Post(o => {
+            try { action((T)o!); }
+            finally { context.OperationCompleted(); }
+        },
+            state
+        );
+    }
+
+    public static void PostWithComplete(this SynchronizationContext context, Action action)
+    {
+        context.OperationStarted();
+        context.Post(_ => {
+            try { action(); }
+            finally { context.OperationCompleted(); }
+        },
+            null
+        );
+    }
+
+    /// <summary>
+    /// Helper function to calculate an element's rectangle in root-relative coordinates.
+    /// </summary>
+    public static Windows.Foundation.Rect GetElementRect(this Microsoft.UI.Xaml.FrameworkElement element)
+    {
+        try
+        {
+            Microsoft.UI.Xaml.Media.GeneralTransform transform = element.TransformToVisual(null);
+            Windows.Foundation.Point point = transform.TransformPoint(new Windows.Foundation.Point());
+            return new Windows.Foundation.Rect(point, new Windows.Foundation.Size(element.ActualWidth, element.ActualHeight));
+        }
+        catch (Exception)
+        {
+            return new Windows.Foundation.Rect(0, 0, 0, 0);
+        }
+    }
 }
 

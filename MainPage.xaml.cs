@@ -28,6 +28,10 @@ using ConfigurationAttribute = System.Reflection.AssemblyConfigurationAttribute;
 using FileVersionAttribute = System.Reflection.AssemblyFileVersionAttribute;
 using ProductAttribute = System.Reflection.AssemblyProductAttribute;
 using CompanyAttribute = System.Reflection.AssemblyCompanyAttribute;
+using Microsoft.UI.Xaml.Media.Imaging;
+using Windows.Foundation;
+using Windows.ApplicationModel;
+using System.Threading;
 
 
 namespace IconExtractor;
@@ -39,6 +43,7 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
 {
     #region [Props]
     bool _loaded = false;
+    CancellationTokenSource _cts { get; set; } = new();
     public event PropertyChangedEventHandler? PropertyChanged;
     public ObservableCollection<IconIndexItem> IconItems { get; set; } = new();
 
@@ -512,6 +517,7 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
     public ICommand TraverseCommand { get; }
     public ICommand TestCommand { get; }
     public ICommand AboutCommand { get; }
+    public ICommand DebugCommand { get; }
 
     public MainPage()
     {
@@ -561,6 +567,7 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
                                         if (bmp is not null)
                                         {
                                             ImgSource = (Microsoft.UI.Xaml.Media.ImageSource)bmp;
+                                            //await TestBitmapCropper(ImgSource);
                                             Status = $"Found index #{img.Index}";
                                             IconItems.Add(new IconIndexItem { IconIndex = img.Index, IconImage = ImgSource });
                                             if (SaveToDisk)
@@ -709,12 +716,37 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
             try
             {
                 var data = Extensions.GatherLoadedModules(true);
-                if (string.IsNullOrEmpty(data)) { return; }
                 tbAssemblies.Text = data;
                 contentDialog.XamlRoot = App.MainRoot?.XamlRoot;
                 await contentDialog.ShowAsync();
             }
-            catch (Exception ex) { Status = $"{ex.Message}"; }
+            catch (Exception ex) 
+            { 
+                DispatcherQueue.TryEnqueue(() => Status = $"ERROR: {ex.Message}"); 
+            }
+        });
+
+        // Testing IAsyncOperations.
+        DebugCommand = new RelayCommand<object>(async (obj) =>
+        {
+            try
+            {
+                IAsyncOperationWithProgress<ulong, ulong>? iaop = PerformDownloadAsync(_cts.Token);
+                iaop.Progress = (result, prog) =>
+                {
+                    if (iaop.Status != AsyncStatus.Completed)
+                        DispatcherQueue.TryEnqueue(() => { Status = $"Progress: {prog}%"; });
+                    else
+                        DispatcherQueue.TryEnqueue(() => { Status = $"AsyncStatus: {iaop.Status}"; });
+                };
+
+                var result = await iaop;
+                DispatcherQueue.TryEnqueue(() => { Status = $"AsyncStatus: {iaop.Status}"; });
+            }
+            catch (Exception ex) 
+            { 
+                DispatcherQueue.TryEnqueue(() => Status = $"ERROR: {ex.Message}"); 
+            }
         });
     }
 
@@ -901,6 +933,15 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
         img.Source = bitmapImage;
     }
 
+    async Task TestBitmapCropper(ImageSource source)
+    {
+        if (source is not null)
+        {
+            var cropped = await BitmapHelper.GetCroppedBitmap(source as WriteableBitmap, new Point(1, 1), new Size(10, 10), 1d);
+            //imgCrop.Source = cropped;
+        }
+    }
+
     void IconsOnTemplatePointerPressed(object sender, PointerRoutedEventArgs e)
     {
         var oldIndex = IconItems.IndexOf(SelectedIcon);
@@ -1036,6 +1077,48 @@ public sealed partial class MainPage : Page, INotifyPropertyChanged
     static UInt32 SPI_GETFONTSMOOTHING = 74;
     static UInt32 SPIF_UPDATEINIFILE = 0x1;
     static UInt32 SPIF_SENDWININICHANGE = 0x2;
+    #endregion
+
+    #region [IAsyncOp]
+    public IAsyncOperation<IconFileInfo> GetIconFileAsync(string amount)
+    {
+        return AsyncInfo.Run((cancelToken) =>
+        {
+            if (!cancelToken.IsCancellationRequested)
+                return Task.FromResult(new IconFileInfo(new byte[] { 0x0, 0x01, 0x02, 0x03, 0x04 }, 1));
+            else
+                return Task.FromCanceled<IconFileInfo>(cancelToken);
+        });
+    }
+
+    public IAsyncOperationWithProgress<ulong, ulong> PerformDownloadAsync(CancellationToken token = default)
+    {
+        return AsyncInfo.Run<ulong, ulong>((token, progress) =>
+        {
+            return Task<ulong>.Run(async () =>
+            {
+                ulong length = 0;
+                for (int i = 0; i < 100; i++)
+                {
+                    if (!token.IsCancellationRequested)
+                    {
+                        if (length < 100)
+                            length += 1;
+                        else
+                            length = 100;
+
+                        progress.Report(length);
+
+                        // fake delay to simulate download process
+                        await Task.Delay(30);
+                    }
+                    else
+                        break;
+                }
+                return length;
+            });
+        });
+    }
     #endregion
 }
 

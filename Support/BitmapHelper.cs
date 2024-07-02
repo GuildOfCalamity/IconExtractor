@@ -18,6 +18,7 @@ using Windows.Graphics.Imaging;
 using Windows.Storage.Streams;
 using Windows.Storage;
 using System.Diagnostics;
+using System.Windows.Media.Media3D;
 
 namespace IconExtractor.Support;
 
@@ -385,6 +386,92 @@ internal static class BitmapHelper
         }
     }
     #endregion
+
+    public static async Task<BitmapImage> LoadImageAtRuntime(string imageNameWithExtension)
+    {
+        try
+        {
+            BitmapImage bitmapImage = new BitmapImage();
+            var uri = new Uri($"ms-appx:///Assets/{imageNameWithExtension}");
+#if IS_UNPACKAGED
+            StorageFile file = await StorageFile.GetFileFromPathAsync(Path.Combine(Directory.GetCurrentDirectory(), $"Assets\\{imageNameWithExtension}"));
+#else
+            StorageFile file = await StorageFile.GetFileFromApplicationUriAsync(uri);
+#endif
+            using (var stream = await file.OpenAsync(FileAccessMode.Read))
+            {
+                await bitmapImage.SetSourceAsync(stream); // Set the BitmapImage source to the stream.
+            }
+            return bitmapImage;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ERROR] LoadImageAtRuntime: {ex.Message}");
+            return new BitmapImage() { UriSource = new Uri($"ms-appx:///Assets/{imageNameWithExtension}") };
+        }
+    }
+
+    public static async Task<Microsoft.UI.Xaml.Media.Imaging.WriteableBitmap?> GetCroppedBitmap(Microsoft.UI.Xaml.Media.Imaging.WriteableBitmap? originalImage, Point startPoint, Size cropSize, double scale)
+    {
+        if (double.IsNaN(scale) || double.IsInfinity(scale))
+            scale = 1d;
+
+        if (originalImage is null)
+        {
+            Debug.WriteLine($"[ERROR] {nameof(originalImage)} was null.");
+            return null;
+        }
+        uint startPointX = (uint)Math.Floor(startPoint.X * scale);
+        uint startPointY = (uint)Math.Floor(startPoint.Y * scale);
+        uint height = (uint)Math.Floor(cropSize.Height * scale);
+        uint width = (uint)Math.Floor(cropSize.Width * scale);
+        if (width <= 0 && height <= 0 && (startPointX + width) >= (uint)originalImage.PixelWidth && (startPointY + height) >= (uint)originalImage.PixelHeight)
+        {
+            Debug.WriteLine($"[ERROR] Invalid image dimensions.");
+            return null;
+        }
+        byte[] originalPixels = originalImage.PixelBuffer.ToArray();
+        uint originalWidth = (uint)originalImage.PixelWidth;
+        uint originalHeight = (uint)originalImage.PixelHeight;
+        if (startPointX + width > originalWidth)
+            startPointX = originalWidth - width;
+        if (startPointY + height > originalHeight)
+            startPointY = originalHeight - height;
+
+        byte[] croppedPixels = GetPixelData(originalPixels, startPointX, startPointY, width, height, originalWidth, originalHeight);
+        WriteableBitmap croppedBitmap = new WriteableBitmap((int)width, (int)height);
+        using (Stream stream = croppedBitmap.PixelBuffer.AsStream())
+        {
+            await stream.WriteAsync(croppedPixels, 0, croppedPixels.Length);
+        }
+        return croppedBitmap;
+    }
+
+    static byte[] GetPixelData(byte[] originalPixels, uint startPointX, uint startPointY, uint width, uint height, uint originalWidth, uint originalHeight)
+    {
+        uint stride = originalWidth * 4;
+        byte[] croppedPixels = new byte[width * height * 4];
+        try
+        {
+            for (uint y = 0; y < height; y++)
+            {
+                for (uint x = 0; x < width; x++)
+                {
+                    if ((startPointY + y) * stride + (startPointX + x) * 4 < originalPixels.Length)
+                    {
+                        uint originalIndex = (startPointY + y) * stride + (startPointX + x) * 4;
+                        uint croppedIndex = y * width * 4 + x * 4;
+                        Array.Copy(originalPixels, originalIndex, croppedPixels, croppedIndex, 4);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ERROR] GetPixelData: {ex.Message}");
+        }
+        return croppedPixels;
+    }
 
     /// <summary>
     /// Generic loader for software bitmaps.
